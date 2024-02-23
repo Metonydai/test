@@ -24,13 +24,18 @@ def ezjoin(doc, tmpdoc, sel_layer):
             if e.dxftype() == 'CIRCLE':
                 tmpmsp.add_foreign_entity(e)
             
-            if e.dxftype() == 'LWPOLYLINE':
+            elif e.dxftype() == 'LWPOLYLINE':
                 if e.is_closed or Vec2(e.get_points('xy')[0]).isclose(Vec2(e.get_points('xy')[-1])):
                     e.close(True)
                     tmpmsp.add_foreign_entity(e)
 
-            entity = myEntity(e)
-            entities.append(entity)
+            else:
+                entity = myEntity(e)
+                entities.append(entity)
+            
+        bvh = BVHAccel(entities)
+        #bvh.findCoincidentEntity(entity)
+            
         
 
 from enum import Enum
@@ -52,7 +57,7 @@ class myEntity:
             return BoundingBox2d([l.dxf.start, l.dxf.end])
         elif self.m_entity.dxftype() == 'ARC':
             arc = self.m_entity
-            return BoundingBox2d([arc.dxf.start_point, l.dxf.end_point])
+            return BoundingBox2d([arc.start_point, arc.end_point])
         elif self.m_entity.dxftype() == 'LWPOLYLINE':
             pl = self.m_entity
             bbox = BoundingBox2d()
@@ -71,7 +76,7 @@ class BVHAccel:
         #self.m_maxPrimsInNode = maxPrimsInNode
         self.m_splitMethod = splitMethod.NAIVE
         start = time()
-        if len(self.ents) == 0:
+        if len(self.m_ents) == 0:
             return BVHBuildNode()
 
         self.root = self._recursiveBuild(self.m_ents)
@@ -79,6 +84,8 @@ class BVHAccel:
         print("BVH Generation complete: \nTime Taken: {} secs\n".format(stop-start))
 
     def coincident(self, myEnt):
+        node = self.root
+        return self.findCoincidentEntity(node, myEnt)
     
     def findCoincidentEntity(self, node, myEnt):
         ent = myEnt.m_entity
@@ -90,8 +97,8 @@ class BVHAccel:
             start_point = ent.dxf.start
             end_point = ent.dxf.end
         elif self.m_entity.dxftype() == 'ARC':
-            start_point = ent.dxf.start_point
-            end_point = ent.dxf.end_point
+            start_point = ent.start_point
+            end_point = ent.end_point
         elif self.m_entity.dxftype() == 'LWPOLYLINE':
             start_point = Vec2(ent.get_points('xy')[0])
             end_point = Vec2(ent.get_points('xy')[0])
@@ -99,16 +106,15 @@ class BVHAccel:
             start_point = Vec2(float('inf'), float('inf'))
             end_point = Vec2(float('inf'), float('inf'))
 
-        node = self.root
 
         # Leaf node
         if (node.object != None and node.object != myEnt):
             return node
 
-        if node.left.bounds.insed(end_point):
-            node.left
-        node.left.findC
-        node.right.bounds.inside(end_point)
+        epoint_in_left = node.left.bounds.insed(end_point)
+        epoint_in_right = node.right.bounds.inside(end_point)
+
+        return
 
     
     def _recursiveBuild(self, ents):
@@ -133,9 +139,9 @@ class BVHAccel:
                 centroidBounds.extend([Centroid(ents[i].get_bounds())])
             dim = maxExtent(centroidBounds)
             if dim == 0:
-                sorted(ents, key=lambda ent: ent.get_bounds().x)
+                sorted(ents, key=lambda ent: Centroid(ent.get_bounds()).x)
             elif dim == 1:
-                sorted(ents, key=lambda ent: ent.get_bounds().y)
+                sorted(ents, key=lambda ent: Centroid(ent.get_bounds()).y)
             
             median = int((len(ents)+1)/2)
 
@@ -166,8 +172,6 @@ class BVHBuildNode:
         self.object = None
         self.bounds = BoundingBox2d()
 
-bvh = BVHAccel(entities)
-bvh.findCoincidentEntity(entity)
 
 ezjoin(doc, tmpdoc, sel_layer)
 
