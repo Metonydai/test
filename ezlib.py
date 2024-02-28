@@ -2,6 +2,7 @@ import math
 import ezdxf
 from ezdxf.math import Vec2
 from ezdxf.math import BoundingBox2d
+from ezdxf.math import arc_angle_span_deg
 import FreeCAD
 import Draft
 import Part
@@ -51,12 +52,16 @@ class BVHAccel:
 
         # Leaf node
         if node.object != None:
+            # Find itself
+            if node.object == myEnt:
+                return None
+
             # end connect start
             if node.object.Vertexes[0].isclose(myEnt.Vertexes[end]):
                 return node.object
             
             # end connect end
-            elif node.object.Vetexes[-1].isclose(myEnt.Vertexes[end]):
+            elif node.object.Vertexes[-1].isclose(myEnt.Vertexes[end]):
                 node.object.reverse = True
                 return node.object
 
@@ -66,15 +71,15 @@ class BVHAccel:
         # Try myEnt end_point
         point_in_left = node.left.bounds.inside(myEnt.Vertexes[end])
         point_in_right = node.right.bounds.inside(myEnt.Vertexes[end])
-        if point_in_left and !point_in_right:
-            getNextEntity(node.left, myEnt)
-        elif point_in_right and !point_in_left:
-            getNextEntity(node.right, myEnt)
+        if point_in_left and not point_in_right:
+            return self.getNextEntity(node.left, myEnt)
+        elif point_in_right and not point_in_left:
+            return self.getNextEntity(node.right, myEnt)
         elif point_in_left and point_in_right:
             if node.left.bounds.inside(myEnt.Vertexes[st]): # myEnt start_point in node.left
-                getNextEntity(node.right, myEnt)
+                return self.getNextEntity(node.right, myEnt) or self.getNextEntity(node.left, myEnt)
             else:
-                getNextEntity(node.left, myEnt)
+                return self.getNextEntity(node.left, myEnt) or self.getNextEntity(node.right, myEnt)
 
         return None
 
@@ -84,7 +89,7 @@ class BVHAccel:
         node = self.root
         return self.getPreviousEntity(node, myEnt)
     
-    def getPreviosEntity(self, node, myEnt):
+    def getPreviousEntity(self, node, myEnt):
         # check myEnt reverse: st, end 
         if myEnt.reverse == False:
             st,end = 0,-1
@@ -93,30 +98,34 @@ class BVHAccel:
 
         # Leaf node
         if node.object != None:
+            # Find itself
+            if node.object == myEnt:
+                return None
+
             # end connect start
             if node.object.Vertexes[-1].isclose(myEnt.Vertexes[st]):
                 return node.object
             
             # start connect start
-            elif node.object.Vetexes[0].isclose(myEnt.Vertexes[st]):
+            elif node.object.Vertexes[0].isclose(myEnt.Vertexes[st]):
                 node.object.reverse = True
                 return node.object
 
             else:
                 return None
 
-        # Try myEnt end_point
+        # Try myEnt start_point
         point_in_left = node.left.bounds.inside(myEnt.Vertexes[st])
         point_in_right = node.right.bounds.inside(myEnt.Vertexes[st])
-        if point_in_left and !point_in_right:
-            getNextEntity(node.left, myEnt)
-        elif point_in_right and !point_in_left:
-            getNextEntity(node.right, myEnt)
+        if point_in_left and not point_in_right:
+            return self.getPreviousEntity(node.left, myEnt)
+        elif point_in_right and not point_in_left:
+            return self.getPreviousEntity(node.right, myEnt)
         elif point_in_left and point_in_right:
             if node.left.bounds.inside(myEnt.Vertexes[end]): # myEnt end_point in node.left
-                getCoincidentEntity(node.right, myEnt)
+                return self.getPreviousEntity(node.right, myEnt) or self.getPreviousEntity(node.left, myEnt)
             else:
-                getCoincidentEntity(node.left, myEnt)
+                return self.getPreviousEntity(node.left, myEnt) or self.getPreviousEntity(node.right, myEnt)
 
         return None
     
@@ -143,14 +152,14 @@ class BVHAccel:
                 centroidBounds.extend([Centroid(ents[i].get_bounds())])
             dim = maxExtent(centroidBounds)
             if dim == 0:
-                sorted(ents, key=lambda ent: Centroid(ent.get_bounds()).x)
+                sorted_ents = sorted(ents, key=lambda ent: Centroid(ent.get_bounds()).x)
             elif dim == 1:
-                sorted(ents, key=lambda ent: Centroid(ent.get_bounds()).y)
+                sorted_ents = sorted(ents, key=lambda ent: Centroid(ent.get_bounds()).y)
             
-            median = int((len(ents)+1)/2)
+            median = int((len(sorted_ents)+1)/2)
 
-            leftentities = ents[0:median]
-            rightentities = ents[median:]
+            leftentities = sorted_ents[0:median]
+            rightentities = sorted_ents[median:]
             node.left = self._recursiveBuild(leftentities)
             node.right = self._recursiveBuild(rightentities)
 
@@ -161,7 +170,7 @@ class BVHAccel:
 def ezJoinPolys(entities): 
     bvh = BVHAccel(entities)
     sorted_polys = []
-    for i range(len(entities)):
+    for i in range(len(entities)):
         if entities[i].joined:
             continue
 
@@ -179,7 +188,7 @@ def ezJoinPolys(entities):
             if nextEntity.Vertexes[end].isclose(polys[0].Vertexes[0]):
                 polys.append(nextEntity)
                 nextEntity.joined = True
-                poly_is_close = True
+                poly_is_closed = True
                 break
 
             # Join nextEntity
@@ -221,11 +230,11 @@ def maxExtent(bbox):
         return 1
 
 class myEntity:
-    def __init__(self, entity, dxftype):
+    def __init__(self, entity):
         self.m_entity = entity
         self.reverse = False
         self.joined = False
-        self.Vertexes = self.getVertexes(dxftype)
+        self.Vertexes = self.getVertexes()
     
     def get_bounds(self):
         #if self.m_entity.dxftype() == 'CIRCLE':
@@ -241,18 +250,19 @@ class myEntity:
         elif self.m_entity.dxftype() == 'LWPOLYLINE':
             pl = self.m_entity
             bbox = BoundingBox2d()
-            return bbox.extend(pl.vertice())
+            bbox.extend(pl.vertices())
+            return bbox
 
-    def getVertexes(self, dxftype):
-        if dxftype == 'LINE':
+    def getVertexes(self):
+        if self.m_entity.dxftype() == 'LINE':
             l = self.m_entity
             return [l.dxf.start, l.dxf.end]
-        elif dxftype == 'ARC':
+        elif self.m_entity.dxftype() == 'ARC':
             arc = self.m_entity
             return [arc.start_point, arc.end_point]
-        elif dxftype == 'LWPOLYLINE':
+        elif self.m_entity.dxftype() == 'LWPOLYLINE':
             pl = self.m_entity
-            return [Vec2(pl.get_points['xy'][0]), Vec2(pl.get_points['xy'][-1])]
+            return [Vec2(pl.get_points('xy')[0]), Vec2(pl.get_points('xy')[-1])]
 
 def ezprocessdxf(dxfdoc, sel_layer, mydoc=None):
     FCC.PrintMessage("mydoc : " + mydoc.Name + "\n")
@@ -272,16 +282,16 @@ def ezprocessdxf(dxfdoc, sel_layer, mydoc=None):
 
         # deal with entities
         entities = []
-        for e in msp.query('*[layer=="' + l + '"]'):
+        for e in dxfmsp.query('*[layer=="' + l + '"]'):
             if e.dxftype() == 'CIRCLE':
                 tmpmsp.add_foreign_entity(e)
             
             elif e.dxftype() == 'LINE':
-                entity = myEntity(e, 'LINE')
+                entity = myEntity(e)
                 entities.append(entity)
 
             elif e.dxftype() == 'ARC':
-                entity = myEntity(e, 'ARC')
+                entity = myEntity(e)
                 entities.append(entity)
 
             elif e.dxftype() == 'LWPOLYLINE':
@@ -289,7 +299,7 @@ def ezprocessdxf(dxfdoc, sel_layer, mydoc=None):
                     e.close(True)
                     tmpmsp.add_foreign_entity(e)
                 else:
-                    entity = myEntity(e, 'LWPOLYLINE')
+                    entity = myEntity(e)
                     entities.append(entity)
             
             else:
@@ -298,7 +308,7 @@ def ezprocessdxf(dxfdoc, sel_layer, mydoc=None):
         sorted_entities = ezJoinPolys(entities)
 
         # Draw sorted_entities to tmpmsp on layer l
-        for poly in sorted_entites:
+        for poly in sorted_entities:
             ezaddEntity(poly, tmpmsp, l)
 
     # ======= Draw tmpdoc in FreeCAD =======
@@ -364,10 +374,34 @@ def ezaddEntity(ent_list, tmpmsp, l):
     else:
         vertexes = []
 
+        # Add start vertex to vertexes!
+        for myEnt in ent_list:
+            e = myEnt.m_entity
+            if myEnt.reverse == False:
+                start = 0
+            else:
+                start = -1
+
+            if e.dxftype() == 'LINE':
+                vertexes.append((myEnt.Vertexes[start].x, myEnt.Vertexes[start].y))
+
+            elif e.dxftype() == 'ARC':
+                if myEnt.reverse == False:
+                    vertexes.append((myEnt.Vertexes[start].x, myEnt.Vertexes[start].y,0,0,ezgetBulge(e)))
+                else:
+                    vertexes.append((myEnt.Vertexes[start].x, myEnt.Vertexes[start].y,0,0,-ezgetBulge(e)))
+
+            elif e.dxftype() == 'LWPOLYLINE':
+                if myEnt.reverse == False:
+                    vertexes += e.get_points()[:-1:]
+                else:
+                    vertexes += e.get_points()[::-1][:-1:]
+
         # Obtain is_poly_closed
         is_poly_closed = False
         first_ent = ent_list[0]
         last_ent = ent_list[-1]
+
         if first_ent.reverse == False:
             start = 0
         else:
@@ -381,49 +415,27 @@ def ezaddEntity(ent_list, tmpmsp, l):
         if first_ent.Vertexes[start].isclose(last_ent.Vertexes[end]):
             is_poly_closed = True
         else:
-            e = first_ent.m_entity
-            if e.dxftype() == 'LINE':
-                vertexes.append((e.Vertexes[start].x, e.Vertexes[start.y]))
-
-            elif e.dxftype() == 'ARC':
-                if first_ent.reverse == False:
-                    vertexes.append((e.Vertexes[start].x, e.Vertexes[start.y],0,0,ezgetBulge(e))
-                else:
-                    vertexes.append((e.Vertexes[start].x, e.Vertexes[start.y],0,0,-ezgetBulge(e))
-
-            elif e.dxftype() == 'LWPOLYLINE':
-                if first_ent.reverse == False:
-                    vertexes = e.get_point()[:-1:]
-                else:
-                    vertexes = e.get_point()[::-1][:-1:]
-
-        # Do not add start vertex to vertexes!
-        for myEnt in ent_list[1::]:
-            e = myEnt.m_entity
-
-            if e.dxftype() == 'LINE':
-                pass
-
-            elif e.dxftype() == 'ARC':
-                pass
-
-            elif e.dxftype() == 'LWPOLYLINE':
-                if e.is_closed or Vec2(e.get_points('xy')[0]).isclose(Vec2(e.get_points('xy')[-1])):
-                    e.close(True)
-                    tmpmsp.add_foreign_entity(e)
-                else:
-                    entity = myEntity(e, 'LWPOLYLINE')
-                    entities.append(entity)
+            #Add last_end Vertexes[end]
+            vertexes.append((last_ent.Vertexes[end].x, myEnt.Vertexes[end].y))
 
         tmpmsp.add_lwpolyline(vertexes, close=is_poly_closed, dxfattribs={"layer": l})
 
-from ezdxf.math import arc_angle_span_deg
 def ezgetBulge(arc):
     span_angle = arc_angle_span_deg(arc.dxf.start_angle, arc.dxf.end_angle)
     V1 = arc.start_point
     V2 = arc.end_point
-
-
+    center = arc.dxf.center
+    radius = arc.dxf.radius
+    M = (V1 + V2)/2
+    epsilon = 0.0001
+    if span_angle < 180 - epsilon:
+        d = radius * (M - center).normalize()
+    elif abs(span_angle - 180.0) < epsilon:
+            return 1.0
+    else:
+        d = radius * (center - M).normalize()
+    S = center + d
+    return S.distance(M) / V2.distance(M)
 
 
 def ezjoin(shapes): 
