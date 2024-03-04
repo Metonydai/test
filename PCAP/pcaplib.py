@@ -1,74 +1,173 @@
-import FreeCAD
 import os
-import glob
+from PySide2 import QtCore, QtGui, QtWidgets, QtWebEngineWidgets
+import FreeCAD 
+import FreeCADGui
+import pcaplib
 import logging
+import WorkSilk
 
-def get_param(param_name):
-    FSParam = FreeCAD.ParamGet("User parameter:BaseApp/Preferences/Mod/PCAP")
-    return FSParam.GetString(param_name)
+import ezdxf
+from FreeCAD import Console as FCC
+import ezlib
 
-def get_pcap_dxf_file_path():
-    return get_param("prefPCAPDXFFilePath")
+__dir__ = os.path.dirname(__file__)
 
-def get_pcap_dr():
-    return get_param("prefPCAPDr")
+class Setting:
+    def __init__(self):
+        # Load the UI file from the same directory as this script
+        ui_path = os.path.join(FreeCAD.getHomePath(), "Mod", "PCAP", "setting.ui")
+        self.widget = FreeCADGui.PySideUic.loadUi(ui_path, self)
 
-def get_pcap_d_board():
-    return get_param("prefPCAPDboard")
+        icon_path = os.path.join(FreeCAD.getHomePath(), "Mod", "PCAP", "icons", "Font_P.svg")
+        self.widget.setWindowIcon(QtGui.QIcon(icon_path))
 
-def get_pcap_do():
-    return get_param("prefPCAPDo")
+        # Restore size and position
+        p = FreeCAD.ParamGet("User parameter:BaseApp/Preferences/Mod/PCAP")
+        w = p.GetInt("PCAPWebViewWidth", 400)
+        h = p.GetInt("PCAPWebViewHeight", 700)
+        self.widget.resize(w, h)
 
-def get_pcap_dl():
-    return get_param("prefPCAPDl")
+        # Additional UI fixes and tweaks
+        self.widget.pushButtonChooseDir.clicked.connect(self.on_pushButtonChooseDir_clicked)
+        self.widget.playButton.setDisabled(True)
+        self.widget.playButton.clicked.connect(self.on_playButton_clicked)
+        self.widget.saveButton.clicked.connect(self.on_saveButton_clicked)
+        
+        # layer of open switch
+        self.widget.layerOfOpenSwitch.setCheckable(True)
+        self.widget.layerOfOpenSwitch.clicked.connect(self.on_openSwitch_clicked)
 
-def get_pcap_dw():
-    return get_param("prefPCAPDw")
+        # dxf doc
+        self.dxfdoc = None
 
-def get_pcap_area_bound():
-    return get_param("prefPCAPAreaBound")
+        # layers_open : for open switch swap use
+        self.layers_open = []
 
-def get_pcap_layer_of_botsilk():
-    return get_param("prefPCAPLayerOfBotsilk")
+    def show(self):
+        return self.widget.show()
 
-def get_pcap_layer_of_botmask():
-    return get_param("prefPCAPLayerOfBotmask")
+    @QtCore.Slot()
+    def on_pushButtonChooseDir_clicked(self):
+        pcaplib.validate_token()
+        dir_choose = QtWidgets.QFileDialog.getExistingDirectory(None, "FileDialog", "")
+        if dir_choose:
+            self.set_dir_path(dir_choose)
 
-def get_pcap_layer_of_open():
-    return get_param("prefPCAPLayerOfOpen")
+    @QtCore.Slot()
+    def on_playButton_clicked(self):
+        self.widget.hide()
+        #print(self.get_all_selected_layers())
+        ezlib.ezprocessdxf(self.dxfdoc, self.get_all_selected_layers(), FreeCAD.ActiveDocument)
+        WorkSilk.run()
 
-def get_pcap_layer_of_board_sink():
-    return get_param("prefPCAPLayerOfBoardSink")
+    @QtCore.Slot()
+    def on_saveButton_clicked(self):
+        pcaplib.set_param("prefPCAPDr", self.widget.prefPCAPDr.text())
+        pcaplib.set_param("prefPCAPDboard", self.widget.prefPCAPDboard.text())
+        pcaplib.set_param("prefPCAPDo", self.widget.prefPCAPDo.text())
+        pcaplib.set_param("prefPCAPDl", self.widget.prefPCAPDl.text())
+        pcaplib.set_param("prefPCAPDw", self.widget.prefPCAPDw.text())
+        pcaplib.set_param("prefPCAPAreaBound", self.widget.prefPCAPAreaBound.text())
+        pcaplib.set_param("prefPCAPOutputFolder", self.widget.prefPCAPOutputFolder.text())
 
-def get_pcap_dxf_layers():
-    return get_param("prefPCAPLayers")
+        pcaplib.set_param("prefPCAPLayerOfBotsilk", self.widget.prefPCAPLayerOfBotsilk.currentText())
+        pcaplib.set_param("prefPCAPLayerOfBotmask", self.widget.prefPCAPLayerOfBotmask.currentText())
+        pcaplib.set_param("prefPCAPLayerOfOpen", self.widget.prefPCAPLayerOfOpen.currentText())
+        pcaplib.set_param("prefPCAPLayerOfBoardSink", self.widget.prefPCAPLayerOfBoardSink.currentText())
+        delimiter = ','
+        pcaplib.set_param("prefPCAPLayers", delimiter.join(self.get_item_text_from_selected_items()))
+        
+        # Enable play button not until click save button
+        self.widget.playButton.setDisabled(False)
+
+    @QtCore.Slot()
+    def on_openSwitch_clicked(self):
+        if self.widget.layerOfOpenSwitch.isChecked():
+            pcaplib.set_param("prefPCAPLayerOfOpenSwitch", True, "Bool")
+            if self.layers_open:
+                self.widget.prefPCAPLayerOfOpen.addItems(self.layers_open)
+                qListWidget = self.widget.prefPCAPListOfLayers
+                for layer in self.layers_open:
+                    for i in reversed(range(qListWidget.count())):
+                        if qListWidget.item(i).text() == layer:
+                            qListWidget.takeItem(i)
+                            break
+
+        else:
+            pcaplib.set_param("prefPCAPLayerOfOpenSwitch", False, "Bool")
+            if self.layers_open:
+                self.widget.prefPCAPLayerOfOpen.clear()
+                self.widget.prefPCAPListOfLayers.addItems(self.layers_open)
+
+    def set_dir_path(self, dir_path):
+        self.widget.prefPCAPOutputFolder.setText(dir_path)
+
+    def add_item_to_layer_selection(self):
+        import re
+        self.widget.prefPCAPListOfLayers.setSelectionMode(QtWidgets.QAbstractItemView.MultiSelection)
+
+        objects = [layer.dxf.name for layer in self.dxfdoc.layers]
+        obj_array = []
+        obj_botsilk = []
+        obj_botmask = []
+        obj_open = []
+        obj_board_sink =[]
+        for i in range(len(objects)):
+            if  re.search('bot', objects[i].lower()):
+                if re.search('silk', objects[i].lower()):
+                    obj_botsilk.append(objects[i])
+                elif re.search('mask|solder|paste', objects[i].lower()):
+                    obj_botmask.append(objects[i])
+            elif re.search('open|through|thru', objects[i].lower()):
+                obj_open.append(objects[i])
+            elif re.search('2\.5|1\.6', objects[i].lower()):
+                obj_board_sink.append(objects[i])
+            else:
+                obj_array.append(objects[i])
+        
+        self.widget.prefPCAPLayerOfBotsilk.addItems(obj_botsilk)
+        self.widget.prefPCAPLayerOfBotmask.addItems(obj_botmask)
+        self.widget.prefPCAPLayerOfOpen.addItems(obj_open)
+        self.widget.prefPCAPLayerOfBoardSink.addItems(obj_board_sink)
+        self.widget.prefPCAPListOfLayers.addItems(obj_array)
+        
+        # layers_open : for open switch swap use
+        self.layers_open = obj_open 
+        if obj_open:
+            pcaplib.set_param("prefPCAPLayerOfOpenSwitch", True, "Bool")
+            self.widget.layerOfOpenSwitch.setChecked(True)
+        else:
+            pcaplib.set_param("prefPCAPLayerOfOpenSwitch", False, "Bool")
+            self.widget.layerOfOpenSwitch.setChecked(False)
+
     
-def get_pcap_output_folder():
-    return get_param("prefPCAPOutputFolder")
+    def del_item_to_layer_selection(self):
+        self.widget.prefPCAPLayerOfBotsilk.clear()
+        self.widget.prefPCAPLayerOfBotmask.clear()
+        self.widget.prefPCAPLayerOfOpen.clear()
+        self.widget.prefPCAPLayerOfBoardSink.clear()
+        self.widget.prefPCAPListOfLayers.clear()
     
-
-def set_param(param_name, value):
-    FSParam = FreeCAD.ParamGet("User parameter:BaseApp/Preferences/Mod/PCAP")
-    FSParam.SetString(param_name, value)
-
-def get_token_by_plugin():
-    folder_path = os.path.join('C:\\Users\\', os.environ.get('USERNAME'), 'AppData\\Local\\FreeCAD\\QtWebEngine\\Default\\Local Storage\\leveldb\\*.log')
-    files = glob.glob(folder_path)
+    def get_item_text_from_selected_items(self):
+        items = self.widget.prefPCAPListOfLayers.selectedItems()
+        x = []
+        for i in range(len(items)):
+            x.append(str(self.widget.prefPCAPListOfLayers.selectedItems()[i].text()))
+        return x
     
-    latest_file_path = max(files, key=os.path.getctime)
+    def get_all_selected_layers(self):
+        l = []
+        l.extend(self.get_item_text_from_selected_items())
+        if (self.widget.prefPCAPLayerOfBotsilk.currentText()):
+            l.append(self.widget.prefPCAPLayerOfBotsilk.currentText())
+        if (self.widget.prefPCAPLayerOfBotmask.currentText()):
+            l.append(self.widget.prefPCAPLayerOfBotmask.currentText())
+        if (self.widget.prefPCAPLayerOfOpen.currentText()):
+            l.append(self.widget.prefPCAPLayerOfOpen.currentText())
+        if (self.widget.prefPCAPLayerOfBoardSink.currentText()):
+            l.append(self.widget.prefPCAPLayerOfBoardSink.currentText())
+        return l
 
-    with open(latest_file_path, encoding='latin-1') as f:
-        line = f.read()
-
-    token = line[line.rfind("user.token") + 13:]
-    return token
-
-def validate_token():
-    plugin_token = get_token_by_plugin()
-
-    if not plugin_token:
-        logging.error("Token is illegal! Please check that you are logged in as a user.")
-        raise Exception("Token is illegal!")
-
-
-
+    def set_dxfdoc(self, file_path):
+        self.dxfdoc = ezdxf.readfile(file_path)
+        FCC.PrintMessage("successfully loaded " + file_path + "\n")
