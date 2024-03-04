@@ -32,6 +32,9 @@ class Setting:
         self.widget.playButton.setDisabled(True)
         self.widget.playButton.clicked.connect(self.on_playButton_clicked)
         self.widget.saveButton.clicked.connect(self.on_saveButton_clicked)
+        
+        # layer of open switch
+        self.widget.layerOfOpenSwitch.setCheckable(True)
 
         # dxf doc
         self.dxfdoc = None
@@ -128,6 +131,9 @@ class Setting:
         pcaplib.set_param("prefPCAPLayerOfBoardSink", self.widget.prefPCAPLayerOfBoardSink.currentText())
         delimiter = ','
         pcaplib.set_param("prefPCAPLayers", delimiter.join(self.get_item_text_from_selected_items()))
+        
+        # Enable play button not until click save button
+        self.widget.playButton.setDisabled(False)
 
     def set_dxfdoc(self, file_path):
         self.dxfdoc = ezdxf.readfile(file_path)
