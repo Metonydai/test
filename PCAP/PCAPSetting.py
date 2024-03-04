@@ -35,9 +35,13 @@ class Setting:
         
         # layer of open switch
         self.widget.layerOfOpenSwitch.setCheckable(True)
+        self.widget.layerOfOpenSwitch.clicked.connect(self.on_openSwitch_clicked)
 
         # dxf doc
         self.dxfdoc = None
+
+        # layers_open : for open switch swap use
+        self.layers_open = []
 
     def show(self):
         return self.widget.show()
@@ -48,6 +52,52 @@ class Setting:
         dir_choose = QtWidgets.QFileDialog.getExistingDirectory(None, "FileDialog", "")
         if dir_choose:
             self.set_dir_path(dir_choose)
+
+    @QtCore.Slot()
+    def on_playButton_clicked(self):
+        self.widget.hide()
+        #print(self.get_all_selected_layers())
+        ezlib.ezprocessdxf(self.dxfdoc, self.get_all_selected_layers(), FreeCAD.ActiveDocument)
+        WorkSilk.run()
+
+    @QtCore.Slot()
+    def on_saveButton_clicked(self):
+        pcaplib.set_param("prefPCAPDr", self.widget.prefPCAPDr.text())
+        pcaplib.set_param("prefPCAPDboard", self.widget.prefPCAPDboard.text())
+        pcaplib.set_param("prefPCAPDo", self.widget.prefPCAPDo.text())
+        pcaplib.set_param("prefPCAPDl", self.widget.prefPCAPDl.text())
+        pcaplib.set_param("prefPCAPDw", self.widget.prefPCAPDw.text())
+        pcaplib.set_param("prefPCAPAreaBound", self.widget.prefPCAPAreaBound.text())
+        pcaplib.set_param("prefPCAPOutputFolder", self.widget.prefPCAPOutputFolder.text())
+
+        pcaplib.set_param("prefPCAPLayerOfBotsilk", self.widget.prefPCAPLayerOfBotsilk.currentText())
+        pcaplib.set_param("prefPCAPLayerOfBotmask", self.widget.prefPCAPLayerOfBotmask.currentText())
+        pcaplib.set_param("prefPCAPLayerOfOpen", self.widget.prefPCAPLayerOfOpen.currentText())
+        pcaplib.set_param("prefPCAPLayerOfBoardSink", self.widget.prefPCAPLayerOfBoardSink.currentText())
+        delimiter = ','
+        pcaplib.set_param("prefPCAPLayers", delimiter.join(self.get_item_text_from_selected_items()))
+        
+        # Enable play button not until click save button
+        self.widget.playButton.setDisabled(False)
+
+    @QtCore.Slot()
+    def on_openSwitch_clicked(self):
+        if self.widget.layerOfOpenSwitch.isChecked():
+            pcaplib.set_param("prefPCAPLayerOfOpenSwitch", True, "Bool")
+            if self.layers_open:
+                self.widget.prefPCAPLayerOfOpen.addItems(self.layers_open)
+                qListWidget = self.widget.prefPCAPListOfLayers
+                for layer in self.layers_open:
+                    for i in reversed(range(qListWidget.count())):
+                        if qListWidget.item(i).text() == layer:
+                            qListWidget.takeItem(i)
+                            break
+
+        else:
+            pcaplib.set_param("prefPCAPLayerOfOpenSwitch", False, "Bool")
+            if self.layers_open:
+                self.widget.prefPCAPLayerOfOpen.clear()
+                self.widget.prefPCAPListOfLayers.addItems(self.layers_open)
 
     def set_dir_path(self, dir_path):
         self.widget.prefPCAPOutputFolder.setText(dir_path)
@@ -80,6 +130,16 @@ class Setting:
         self.widget.prefPCAPLayerOfOpen.addItems(obj_open)
         self.widget.prefPCAPLayerOfBoardSink.addItems(obj_board_sink)
         self.widget.prefPCAPListOfLayers.addItems(obj_array)
+        
+        # layers_open : for open switch swap use
+        self.layers_open = obj_open 
+        if obj_open:
+            pcaplib.set_param("prefPCAPLayerOfOpenSwitch", True, "Bool")
+            self.widget.layerOfOpenSwitch.setChecked(True)
+        else:
+            pcaplib.set_param("prefPCAPLayerOfOpenSwitch", False, "Bool")
+            self.widget.layerOfOpenSwitch.setChecked(False)
+
     
     def del_item_to_layer_selection(self):
         self.widget.prefPCAPLayerOfBotsilk.clear()
@@ -108,35 +168,6 @@ class Setting:
             l.append(self.widget.prefPCAPLayerOfBoardSink.currentText())
         return l
 
-    @QtCore.Slot()
-    def on_playButton_clicked(self):
-        self.widget.hide()
-        #print(self.get_all_selected_layers())
-        ezlib.ezprocessdxf(self.dxfdoc, self.get_all_selected_layers(), FreeCAD.ActiveDocument)
-        #WorkSilk.run()
-
-    @QtCore.Slot()
-    def on_saveButton_clicked(self):
-        pcaplib.set_param("prefPCAPDr", self.widget.prefPCAPDr.text())
-        pcaplib.set_param("prefPCAPDboard", self.widget.prefPCAPDboard.text())
-        pcaplib.set_param("prefPCAPDo", self.widget.prefPCAPDo.text())
-        pcaplib.set_param("prefPCAPDl", self.widget.prefPCAPDl.text())
-        pcaplib.set_param("prefPCAPDw", self.widget.prefPCAPDw.text())
-        pcaplib.set_param("prefPCAPAreaBound", self.widget.prefPCAPAreaBound.text())
-        pcaplib.set_param("prefPCAPOutputFolder", self.widget.prefPCAPOutputFolder.text())
-
-        pcaplib.set_param("prefPCAPLayerOfBotsilk", self.widget.prefPCAPLayerOfBotsilk.currentText())
-        pcaplib.set_param("prefPCAPLayerOfBotmask", self.widget.prefPCAPLayerOfBotmask.currentText())
-        pcaplib.set_param("prefPCAPLayerOfOpen", self.widget.prefPCAPLayerOfOpen.currentText())
-        pcaplib.set_param("prefPCAPLayerOfBoardSink", self.widget.prefPCAPLayerOfBoardSink.currentText())
-        delimiter = ','
-        pcaplib.set_param("prefPCAPLayers", delimiter.join(self.get_item_text_from_selected_items()))
-        
-        # Enable play button not until click save button
-        self.widget.playButton.setDisabled(False)
-
     def set_dxfdoc(self, file_path):
         self.dxfdoc = ezdxf.readfile(file_path)
         FCC.PrintMessage("successfully loaded " + file_path + "\n")
-
-
