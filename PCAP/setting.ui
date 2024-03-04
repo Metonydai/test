@@ -288,8 +288,21 @@
        <number>11</number>
       </property>
       <item>
-       <widget class="QComboBox" name="prefPCAPLayerOfOpen">
-       </widget>
+        <widget class="QComboBox" name="prefPCAPLayerOfOpen">
+        </widget>
+      </item>
+      <item>
+        <widget class="QPushButton" name="layerOfOpenSwitch">
+            <property name="maximumSize">
+                <size>
+                <width>50</width>
+                <height>16777215</height>
+                </size>
+            </property>
+            <property name="text">
+                <string>ON/OFF</string>
+            </property>
+        </widget>
       </item>
      </layout>
     </widget>
