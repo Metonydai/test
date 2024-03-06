@@ -32,6 +32,7 @@ class Setting:
         self.widget.playButton.setDisabled(True)
         self.widget.playButton.clicked.connect(self.on_playButton_clicked)
         self.widget.saveButton.clicked.connect(self.on_saveButton_clicked)
+        self.widget.tabWidget.currentChanged.connect(self.on_change_tab)
         
         # QtabWidget
         # Layer of open switch
@@ -44,7 +45,7 @@ class Setting:
         # layers_open : for open switch swap use
         self.layers_open = []
 
-        # Remember user's last time settings
+        # Remember user's last settings
         self.widget.prefPCAPDr.setText(p.GetString("prefPCAPDr", "3.0"))
         self.widget.prefPCAPDboard.setText(p.GetString("prefPCAPDboard", "0.2"))
         self.widget.prefPCAPDo.setText(p.GetString("prefPCAPDo", "1.0"))
@@ -99,6 +100,10 @@ class Setting:
         
         # Enable play button not until click save button
         self.widget.playButton.setDisabled(False)
+
+    @QtCore.Slot()
+    def on_change_tab(self):
+        self.widget.playButton.setDisabled(True)
 
     @QtCore.Slot()
     def on_openSwitch_clicked(self):
