@@ -33,7 +33,8 @@ class Setting:
         self.widget.playButton.clicked.connect(self.on_playButton_clicked)
         self.widget.saveButton.clicked.connect(self.on_saveButton_clicked)
         
-        # layer of open switch
+        # QtabWidget
+        # Layer of open switch
         self.widget.layerOfOpenSwitch.setCheckable(True)
         self.widget.layerOfOpenSwitch.clicked.connect(self.on_openSwitch_clicked)
 
@@ -42,6 +43,15 @@ class Setting:
 
         # layers_open : for open switch swap use
         self.layers_open = []
+
+        # Remember user's last time settings
+        self.widget.prefPCAPDr.setText(p.GetString("prefPCAPDr", "3.0"))
+        self.widget.prefPCAPDboard.setText(p.GetString("prefPCAPDboard", "0.2"))
+        self.widget.prefPCAPDo.setText(p.GetString("prefPCAPDo", "1.0"))
+        self.widget.prefPCAPDl.setText(p.GetString("prefPCAPDl", "12.0"))
+        self.widget.prefPCAPDw.setText(p.GetString("prefPCAPDw", "3.0"))
+        self.widget.prefPCAPAreaBound.setText(p.GetString("prefPCAPAreaBound", "3.0"))
+        self.widget.prefPCAPOutputFolder.setText(p.GetString("prefPCAPOutputFolder", ""))
 
     def show(self):
         return self.widget.show()
@@ -56,26 +66,36 @@ class Setting:
     @QtCore.Slot()
     def on_playButton_clicked(self):
         self.widget.hide()
-        #print(self.get_all_selected_layers())
-        ezlib.ezprocessdxf(self.dxfdoc, self.get_all_selected_layers(), FreeCAD.ActiveDocument)
-        WorkSilk.run()
+        #ezlib.ezprocessdxf(self.dxfdoc, self.get_all_selected_layers(), FreeCAD.ActiveDocument)
+        if self.widget.tabWidget.currentIndex() == 0:
+            print("I")
+        elif self.widget.tabWidget.currentIndex() == 1:
+            print("Love")
+            #WorkSilk.run()
+        elif self.widget.tabWidget.currentIndex() == 2:
+            print("Huiyu")
 
     @QtCore.Slot()
     def on_saveButton_clicked(self):
-        pcaplib.set_param("prefPCAPDr", self.widget.prefPCAPDr.text())
-        pcaplib.set_param("prefPCAPDboard", self.widget.prefPCAPDboard.text())
-        pcaplib.set_param("prefPCAPDo", self.widget.prefPCAPDo.text())
-        pcaplib.set_param("prefPCAPDl", self.widget.prefPCAPDl.text())
-        pcaplib.set_param("prefPCAPDw", self.widget.prefPCAPDw.text())
-        pcaplib.set_param("prefPCAPAreaBound", self.widget.prefPCAPAreaBound.text())
-        pcaplib.set_param("prefPCAPOutputFolder", self.widget.prefPCAPOutputFolder.text())
+        if self.widget.tabWidget.currentIndex() == 0:
+            pass
+        elif self.widget.tabWidget.currentIndex() == 1:
+            pcaplib.set_param("prefPCAPDr", self.widget.prefPCAPDr.text())
+            pcaplib.set_param("prefPCAPDboard", self.widget.prefPCAPDboard.text())
+            pcaplib.set_param("prefPCAPDo", self.widget.prefPCAPDo.text())
+            pcaplib.set_param("prefPCAPDl", self.widget.prefPCAPDl.text())
+            pcaplib.set_param("prefPCAPDw", self.widget.prefPCAPDw.text())
+            pcaplib.set_param("prefPCAPAreaBound", self.widget.prefPCAPAreaBound.text())
+            pcaplib.set_param("prefPCAPOutputFolder", self.widget.prefPCAPOutputFolder.text())
 
-        pcaplib.set_param("prefPCAPLayerOfBotsilk", self.widget.prefPCAPLayerOfBotsilk.currentText())
-        pcaplib.set_param("prefPCAPLayerOfBotmask", self.widget.prefPCAPLayerOfBotmask.currentText())
-        pcaplib.set_param("prefPCAPLayerOfOpen", self.widget.prefPCAPLayerOfOpen.currentText())
-        pcaplib.set_param("prefPCAPLayerOfBoardSink", self.widget.prefPCAPLayerOfBoardSink.currentText())
-        delimiter = ','
-        pcaplib.set_param("prefPCAPLayers", delimiter.join(self.get_item_text_from_selected_items()))
+            pcaplib.set_param("prefPCAPLayerOfBotsilk", self.widget.prefPCAPLayerOfBotsilk.currentText())
+            pcaplib.set_param("prefPCAPLayerOfBotmask", self.widget.prefPCAPLayerOfBotmask.currentText())
+            pcaplib.set_param("prefPCAPLayerOfOpen", self.widget.prefPCAPLayerOfOpen.currentText())
+            pcaplib.set_param("prefPCAPLayerOfBoardSink", self.widget.prefPCAPLayerOfBoardSink.currentText())
+            delimiter = ','
+            pcaplib.set_param("prefPCAPLayers", delimiter.join(self.get_item_text_from_selected_items()))
+        elif self.widget.tabWidget.currentIndex() == 2:
+            pass
         
         # Enable play button not until click save button
         self.widget.playButton.setDisabled(False)
