@@ -14,355 +14,388 @@
    <string>PCAP</string>
   </property>
   <layout class="QVBoxLayout" name="verticalLayout_2">
-   <item>
-    <widget class="QGroupBox" name="PCAPGroupBox">
-     <property name="title">
-      <string>PCAP settings</string>
-     </property>
-     <property name="sizePolicy">
-        <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
-            <horstretch>0</horstretch>
-            <verstretch>0</verstretch>
-        </sizepolicy>
-     </property>
-     <layout class="QGridLayout" name="gridLayout">
-      <item row="0" column="0">
-       <layout class="QHBoxLayout" name="horizontalLayout">
         <item>
-         <widget class="QLabel" name="label">
-          <property name="text">
-           <string>Shortest Distance Between SMD Part and Fixture (mm):</string>
-          </property>
-         </widget>
-        </item>
-        <item>
-         <widget class="Gui::PrefLineEdit" name="prefPCAPDr">
-          <property name="toolTip">
-           <string>Type positive float number (number greater than 0) </string>
-          </property>
-          <property name="text">
-           <string notr="true">3.0</string>
-          </property>
-          <property name="readOnly">
-           <bool>false</bool>
-          </property>
-          <property name="prefEntry" stdset="0">
-           <cstring>prefPCAPDr</cstring>
-          </property>
-          <property name="prefPath" stdset="0">
-           <cstring>Mod/PCAP</cstring>
-          </property>
-         </widget>
-        </item>
-       </layout>
-      </item>
-      <item row="1" column="0">
-       <layout class="QHBoxLayout" name="horizontalLayout_1">
-        <item>
-         <widget class="QLabel" name="label_1">
-          <property name="text">
-           <string>Gap Between Board and Fixture (mm):</string>
-          </property>
-         </widget>
-        </item>
-        <item>
-         <widget class="Gui::PrefLineEdit" name="prefPCAPDboard">
-          <property name="toolTip">
-           <string>Type positive float number (number greater than 0) </string>
-          </property>
-          <property name="text">
-           <string notr="true">0.2</string>
-          </property>
-          <property name="readOnly">
-           <bool>false</bool>
-          </property>
-          <property name="prefEntry" stdset="0">
-           <cstring>prefPCAPDboard</cstring>
-          </property>
-          <property name="prefPath" stdset="0">
-           <cstring>Mod/PCAP</cstring>
-          </property>
-         </widget>
-        </item>
-       </layout>
-      </item>
-      <item row="2" column="0">
-       <layout class="QHBoxLayout" name="horizontalLayout_2">
-        <item>
-         <widget class="QLabel" name="label_2">
-          <property name="text">
-           <string>Minimum Thickness for Open Fixture (mm):</string>
-          </property>
-         </widget>
-        </item>
-        <item>
-         <widget class="Gui::PrefLineEdit" name="prefPCAPDo">
-          <property name="toolTip">
-           <string>Type positive float number (number greater than 0) </string>
-          </property>
-          <property name="text">
-           <string notr="true">1.0</string>
-          </property>
-          <property name="readOnly">
-           <bool>false</bool>
-          </property>
-          <property name="prefEntry" stdset="0">
-           <cstring>prefPCAPDo</cstring>
-          </property>
-          <property name="prefPath" stdset="0">
-           <cstring>Mod/PCAP</cstring>
-          </property>
-         </widget>
-        </item>
-       </layout>
-      </item>
-      <item row="3" column="0">
-       <layout class="QHBoxLayout" name="horizontalLayout_3">
-        <item>
-         <widget class="QLabel" name="label_3">
-          <property name="text">
-           <string>Minimum Length for Connect Groove (mm):</string>
-          </property>
-         </widget>
-        </item>
-        <item>
-         <widget class="Gui::PrefLineEdit" name="prefPCAPDl">
-          <property name="toolTip">
-           <string>Type positive float number (number greater than 0) </string>
-          </property>
-          <property name="text">
-           <string notr="true">12.0</string>
-          </property>
-          <property name="readOnly">
-           <bool>false</bool>
-          </property>
-          <property name="prefEntry" stdset="0">
-           <cstring>prefPCAPDl</cstring>
-          </property>
-          <property name="prefPath" stdset="0">
-           <cstring>Mod/PCAP</cstring>
-          </property>
-         </widget>
-        </item>
-       </layout>
-      </item>
-      <item row="4" column="0">
-       <layout class="QHBoxLayout" name="horizontalLayout_4">
-        <item>
-         <widget class="QLabel" name="label_4">
-          <property name="text">
-           <string>Minimum Width for Connect Groove (mm):</string>
-          </property>
-         </widget>
-        </item>
-        <item>
-         <widget class="Gui::PrefLineEdit" name="prefPCAPDw">
-          <property name="toolTip">
-           <string>Type positive float number (number greater than 0) </string>
-          </property>
-          <property name="text">
-           <string notr="true">3.0</string>
-          </property>
-          <property name="readOnly">
-           <bool>false</bool>
-          </property>
-          <property name="prefEntry" stdset="0">
-           <cstring>prefPCAPDw</cstring>
-          </property>
-          <property name="prefPath" stdset="0">
-           <cstring>Mod/PCAP</cstring>
-          </property>
-         </widget>
-        </item>
-       </layout>
-      </item>
-      <item row="5" column="0">
-       <layout class="QHBoxLayout" name="horizontalLayout_5">
-        <item>
-         <widget class="QLabel" name="label_5">
-          <property name="text">
-           <string>Area Bound To Distinguish Between SMD Part and PCB (mm*mm):</string>
-          </property>
-         </widget>
-        </item>
-        <item>
-         <widget class="Gui::PrefLineEdit" name="prefPCAPAreaBound">
-          <property name="toolTip">
-           <string>Type positive float number (number greater than 0)</string>
-          </property>
-          <property name="text">
-           <string notr="true">500</string>
-          </property>
-          <property name="readOnly">
-           <bool>false</bool>
-          </property>
-          <property name="prefEntry" stdset="0">
-           <cstring>prefPCAPAreaBound</cstring>
-          </property>
-          <property name="prefPath" stdset="0">
-           <cstring>Mod/PCAP</cstring>
-          </property>
-         </widget>
-        </item>
-       </layout>
-      </item>
-     </layout>
-    </widget>
-   </item>
+            <widget class="QTabWidget" name="tabWidget">
+                <!-- First tab for router -->
+                <widget class="QWidget" name="tab_router">
+                    <attribute name="title">
+                        <string>Router</string>
+                    </attribute>
+                    <layout class="QVBoxLayout" name="verticalLayout">
+
+                    </layout>
+                </widget>
+
+                <!-- Second tab for wave_solder -->
+                <widget class="QWidget" name="tab_wave">
+                    <attribute name="title">
+                        <string>Wave_Solder</string>
+                    </attribute>
+                    <layout class="QVBoxLayout" name="verticalLayout_2">
+                        <item>
+                            <widget class="QGroupBox" name="PCAPGroupBox">
+                            <property name="title">
+                            <string>PCAP settings</string>
+                            </property>
+                            <property name="sizePolicy">
+                                <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
+                                    <horstretch>0</horstretch>
+                                    <verstretch>0</verstretch>
+                                </sizepolicy>
+                            </property>
+                            <layout class="QGridLayout" name="gridLayout">
+                            <item row="0" column="0">
+                            <layout class="QHBoxLayout" name="horizontalLayout">
+                                <item>
+                                <widget class="QLabel" name="label">
+                                <property name="text">
+                                <string>Shortest Distance Between SMD Part and Fixture (mm):</string>
+                                </property>
+                                </widget>
+                                </item>
+                                <item>
+                                <widget class="Gui::PrefLineEdit" name="prefPCAPDr">
+                                <property name="toolTip">
+                                <string>Type positive float number (number greater than 0) </string>
+                                </property>
+                                <property name="text">
+                                <string notr="true">3.0</string>
+                                </property>
+                                <property name="readOnly">
+                                <bool>false</bool>
+                                </property>
+                                <property name="prefEntry" stdset="0">
+                                <cstring>prefPCAPDr</cstring>
+                                </property>
+                                <property name="prefPath" stdset="0">
+                                <cstring>Mod/PCAP</cstring>
+                                </property>
+                                </widget>
+                                </item>
+                            </layout>
+                            </item>
+                            <item row="1" column="0">
+                            <layout class="QHBoxLayout" name="horizontalLayout_1">
+                                <item>
+                                <widget class="QLabel" name="label_1">
+                                <property name="text">
+                                <string>Gap Between Board and Fixture (mm):</string>
+                                </property>
+                                </widget>
+                                </item>
+                                <item>
+                                <widget class="Gui::PrefLineEdit" name="prefPCAPDboard">
+                                <property name="toolTip">
+                                <string>Type positive float number (number greater than 0) </string>
+                                </property>
+                                <property name="text">
+                                <string notr="true">0.2</string>
+                                </property>
+                                <property name="readOnly">
+                                <bool>false</bool>
+                                </property>
+                                <property name="prefEntry" stdset="0">
+                                <cstring>prefPCAPDboard</cstring>
+                                </property>
+                                <property name="prefPath" stdset="0">
+                                <cstring>Mod/PCAP</cstring>
+                                </property>
+                                </widget>
+                                </item>
+                            </layout>
+                            </item>
+                            <item row="2" column="0">
+                            <layout class="QHBoxLayout" name="horizontalLayout_2">
+                                <item>
+                                <widget class="QLabel" name="label_2">
+                                <property name="text">
+                                <string>Minimum Thickness for Open Fixture (mm):</string>
+                                </property>
+                                </widget>
+                                </item>
+                                <item>
+                                <widget class="Gui::PrefLineEdit" name="prefPCAPDo">
+                                <property name="toolTip">
+                                <string>Type positive float number (number greater than 0) </string>
+                                </property>
+                                <property name="text">
+                                <string notr="true">1.0</string>
+                                </property>
+                                <property name="readOnly">
+                                <bool>false</bool>
+                                </property>
+                                <property name="prefEntry" stdset="0">
+                                <cstring>prefPCAPDo</cstring>
+                                </property>
+                                <property name="prefPath" stdset="0">
+                                <cstring>Mod/PCAP</cstring>
+                                </property>
+                                </widget>
+                                </item>
+                            </layout>
+                            </item>
+                            <item row="3" column="0">
+                            <layout class="QHBoxLayout" name="horizontalLayout_3">
+                                <item>
+                                <widget class="QLabel" name="label_3">
+                                <property name="text">
+                                <string>Minimum Length for Connect Groove (mm):</string>
+                                </property>
+                                </widget>
+                                </item>
+                                <item>
+                                <widget class="Gui::PrefLineEdit" name="prefPCAPDl">
+                                <property name="toolTip">
+                                <string>Type positive float number (number greater than 0) </string>
+                                </property>
+                                <property name="text">
+                                <string notr="true">12.0</string>
+                                </property>
+                                <property name="readOnly">
+                                <bool>false</bool>
+                                </property>
+                                <property name="prefEntry" stdset="0">
+                                <cstring>prefPCAPDl</cstring>
+                                </property>
+                                <property name="prefPath" stdset="0">
+                                <cstring>Mod/PCAP</cstring>
+                                </property>
+                                </widget>
+                                </item>
+                            </layout>
+                            </item>
+                            <item row="4" column="0">
+                            <layout class="QHBoxLayout" name="horizontalLayout_4">
+                                <item>
+                                <widget class="QLabel" name="label_4">
+                                <property name="text">
+                                <string>Minimum Width for Connect Groove (mm):</string>
+                                </property>
+                                </widget>
+                                </item>
+                                <item>
+                                <widget class="Gui::PrefLineEdit" name="prefPCAPDw">
+                                <property name="toolTip">
+                                <string>Type positive float number (number greater than 0) </string>
+                                </property>
+                                <property name="text">
+                                <string notr="true">3.0</string>
+                                </property>
+                                <property name="readOnly">
+                                <bool>false</bool>
+                                </property>
+                                <property name="prefEntry" stdset="0">
+                                <cstring>prefPCAPDw</cstring>
+                                </property>
+                                <property name="prefPath" stdset="0">
+                                <cstring>Mod/PCAP</cstring>
+                                </property>
+                                </widget>
+                                </item>
+                            </layout>
+                            </item>
+                            <item row="5" column="0">
+                            <layout class="QHBoxLayout" name="horizontalLayout_5">
+                                <item>
+                                <widget class="QLabel" name="label_5">
+                                <property name="text">
+                                <string>Area Bound To Distinguish Between SMD Part and PCB (mm*mm):</string>
+                                </property>
+                                </widget>
+                                </item>
+                                <item>
+                                <widget class="Gui::PrefLineEdit" name="prefPCAPAreaBound">
+                                <property name="toolTip">
+                                <string>Type positive float number (number greater than 0)</string>
+                                </property>
+                                <property name="text">
+                                <string notr="true">500</string>
+                                </property>
+                                <property name="readOnly">
+                                <bool>false</bool>
+                                </property>
+                                <property name="prefEntry" stdset="0">
+                                <cstring>prefPCAPAreaBound</cstring>
+                                </property>
+                                <property name="prefPath" stdset="0">
+                                <cstring>Mod/PCAP</cstring>
+                                </property>
+                                </widget>
+                                </item>
+                            </layout>
+                            </item>
+                            </layout>
+                            </widget>
+                        </item>
+                        
+                        <item>
+                            <widget class="QGroupBox" name="groupBox_2">
+                            <property name="title">
+                            <string>Selecting Botsilk Layer:</string>
+                            </property>
+                            <layout class="QHBoxLayout">
+                            <property name="spacing">
+                            <number>6</number>
+                            </property>
+                            <property name="leftMargin">
+                            <number>11</number>
+                            </property>
+                            <property name="topMargin">
+                            <number>11</number>
+                            </property>
+                            <property name="rightMargin">
+                            <number>11</number>
+                            </property>
+                            <property name="bottomMargin">
+                            <number>11</number>
+                            </property>
+                            <item>
+                            <widget class="QComboBox" name="prefPCAPLayerOfBotsilk">
+                            </widget>
+                            </item>
+                            </layout>
+                            </widget>
+                        </item>    
+                        <item>
+                            <widget class="QGroupBox" name="groupBox_3">
+                            <property name="title">
+                            <string>Selecting Botmask Layer:</string>
+                            </property>
+                            <layout class="QHBoxLayout">
+                            <property name="spacing">
+                            <number>6</number>
+                            </property>
+                            <property name="leftMargin">
+                            <number>11</number>
+                            </property>
+                            <property name="topMargin">
+                            <number>11</number>
+                            </property>
+                            <property name="rightMargin">
+                            <number>11</number>
+                            </property>
+                            <property name="bottomMargin">
+                            <number>11</number>
+                            </property>
+                            <item>
+                            <widget class="QComboBox" name="prefPCAPLayerOfBotmask">
+                            </widget>
+                            </item>
+                            </layout>
+                            </widget>
+                        </item>    
+                        <item>
+                            <widget class="QGroupBox" name="groupBox_4">
+                            <property name="title">
+                            <string>Selecting Open Layer:</string>
+                            </property>
+                            <layout class="QHBoxLayout">
+                            <property name="spacing">
+                            <number>6</number>
+                            </property>
+                            <property name="leftMargin">
+                            <number>11</number>
+                            </property>
+                            <property name="topMargin">
+                            <number>11</number>
+                            </property>
+                            <property name="rightMargin">
+                            <number>11</number>
+                            </property>
+                            <property name="bottomMargin">
+                            <number>11</number>
+                            </property>
+                            <item>
+                                <widget class="QComboBox" name="prefPCAPLayerOfOpen">
+                                </widget>
+                            </item>
+                            <item>
+                                <widget class="QPushButton" name="layerOfOpenSwitch">
+                                    <property name="maximumSize">
+                                        <size>
+                                        <width>50</width>
+                                        <height>16777215</height>
+                                        </size>
+                                    </property>
+                                    <property name="text">
+                                        <string>ON</string>
+                                    </property>
+                                </widget>
+                            </item>
+                            </layout>
+                            </widget>
+                        </item>    
+                        <item>
+                            <widget class="QGroupBox" name="groupBox_5">
+                            <property name="title">
+                            <string>Selecting Board Sink Layer:</string>
+                            </property>
+                            <layout class="QHBoxLayout">
+                            <property name="spacing">
+                            <number>6</number>
+                            </property>
+                            <property name="leftMargin">
+                            <number>11</number>
+                            </property>
+                            <property name="topMargin">
+                            <number>11</number>
+                            </property>
+                            <property name="rightMargin">
+                            <number>11</number>
+                            </property>
+                            <property name="bottomMargin">
+                            <number>11</number>
+                            </property>
+                            <item>
+                            <widget class="QComboBox" name="prefPCAPLayerOfBoardSink">
+                            </widget>
+                            </item>
+                            </layout>
+                            </widget>
+                        </item>    
+                        <item>
+                            <widget class="QGroupBox" name="groupBox_6">
+                            <property name="title">
+                            <string>Selecting Multiple Layers to Analyze:</string>
+                            </property>
+                            <layout class="QHBoxLayout">
+                            <property name="spacing">
+                            <number>6</number>
+                            </property>
+                            <property name="leftMargin">
+                            <number>11</number>
+                            </property>
+                            <property name="topMargin">
+                            <number>11</number>
+                            </property>
+                            <property name="rightMargin">
+                            <number>11</number>
+                            </property>
+                            <property name="bottomMargin">
+                            <number>11</number>
+                            </property>
+                            <item>
+                            <widget class="QListWidget" name="prefPCAPListOfLayers">
+                            </widget>
+                            </item>
+                            </layout>
+                            </widget>
+                        </item>    
+                    </layout>
+                </widget>
+
+                <!-- Second tab for press_fit -->
+                <widget class="QWidget" name="tab_press_fit">
+                    <attribute name="title">
+                        <string>Press_Fit</string>
+                    </attribute>
+                    <layout class="QVBoxLayout" name="verticalLayout_3">
+
+                    </layout>
+                </widget>
    
-   <item>
-    <widget class="QGroupBox" name="groupBox_2">
-     <property name="title">
-      <string>Selecting Botsilk Layer:</string>
-     </property>
-     <layout class="QHBoxLayout">
-      <property name="spacing">
-       <number>6</number>
-      </property>
-      <property name="leftMargin">
-       <number>11</number>
-      </property>
-      <property name="topMargin">
-       <number>11</number>
-      </property>
-      <property name="rightMargin">
-       <number>11</number>
-      </property>
-      <property name="bottomMargin">
-       <number>11</number>
-      </property>
-      <item>
-       <widget class="QComboBox" name="prefPCAPLayerOfBotsilk">
-       </widget>
-      </item>
-     </layout>
-    </widget>
-   </item>    
-   <item>
-    <widget class="QGroupBox" name="groupBox_3">
-     <property name="title">
-      <string>Selecting Botmask Layer:</string>
-     </property>
-     <layout class="QHBoxLayout">
-      <property name="spacing">
-       <number>6</number>
-      </property>
-      <property name="leftMargin">
-       <number>11</number>
-      </property>
-      <property name="topMargin">
-       <number>11</number>
-      </property>
-      <property name="rightMargin">
-       <number>11</number>
-      </property>
-      <property name="bottomMargin">
-       <number>11</number>
-      </property>
-      <item>
-       <widget class="QComboBox" name="prefPCAPLayerOfBotmask">
-       </widget>
-      </item>
-     </layout>
-    </widget>
-   </item>    
-   <item>
-    <widget class="QGroupBox" name="groupBox_4">
-     <property name="title">
-      <string>Selecting Open Layer:</string>
-     </property>
-     <layout class="QHBoxLayout">
-      <property name="spacing">
-       <number>6</number>
-      </property>
-      <property name="leftMargin">
-       <number>11</number>
-      </property>
-      <property name="topMargin">
-       <number>11</number>
-      </property>
-      <property name="rightMargin">
-       <number>11</number>
-      </property>
-      <property name="bottomMargin">
-       <number>11</number>
-      </property>
-      <item>
-        <widget class="QComboBox" name="prefPCAPLayerOfOpen">
-        </widget>
-      </item>
-      <item>
-        <widget class="QPushButton" name="layerOfOpenSwitch">
-            <property name="maximumSize">
-                <size>
-                <width>50</width>
-                <height>16777215</height>
-                </size>
-            </property>
-            <property name="text">
-                <string>ON/OFF</string>
-            </property>
-        </widget>
-      </item>
-     </layout>
-    </widget>
-   </item>    
-   <item>
-    <widget class="QGroupBox" name="groupBox_5">
-     <property name="title">
-      <string>Selecting Board Sink Layer:</string>
-     </property>
-     <layout class="QHBoxLayout">
-      <property name="spacing">
-       <number>6</number>
-      </property>
-      <property name="leftMargin">
-       <number>11</number>
-      </property>
-      <property name="topMargin">
-       <number>11</number>
-      </property>
-      <property name="rightMargin">
-       <number>11</number>
-      </property>
-      <property name="bottomMargin">
-       <number>11</number>
-      </property>
-      <item>
-       <widget class="QComboBox" name="prefPCAPLayerOfBoardSink">
-       </widget>
-      </item>
-     </layout>
-    </widget>
-   </item>    
-   <item>
-    <widget class="QGroupBox" name="groupBox_6">
-     <property name="title">
-      <string>Selecting Multiple Layers to Analyze:</string>
-     </property>
-     <layout class="QHBoxLayout">
-      <property name="spacing">
-       <number>6</number>
-      </property>
-      <property name="leftMargin">
-       <number>11</number>
-      </property>
-      <property name="topMargin">
-       <number>11</number>
-      </property>
-      <property name="rightMargin">
-       <number>11</number>
-      </property>
-      <property name="bottomMargin">
-       <number>11</number>
-      </property>
-      <item>
-       <widget class="QListWidget" name="prefPCAPListOfLayers">
-       </widget>
-      </item>
-     </layout>
-    </widget>
-   </item>    
+            </widget>
+        </item>
 
    <item>
     <widget class="QGroupBox" name="groupBox_2">
