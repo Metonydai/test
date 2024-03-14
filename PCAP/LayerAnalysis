@@ -721,3 +721,23 @@ def run():
     end=time()
 
     App.Console.PrintMessage("t = {}s\n".format(end- start))
+
+
+def findStopBlockWire(l_wires):
+    max_wires = []
+    enclosed_wires = [0] * len(l_wires)
+    for i, l_wire1 in enumerate(l_wires):
+        if enclosed_wires[i] == 1:
+            continue
+        for j, l_wire2 in enumerate(l_wires):
+            if i == j or enclosed_wires[j] == 1:
+                continue
+            if bboxCheck(l_wire1, l_wire2): # l_wire1 encloses l_wire2
+                enclosed_wires[j] = 1
+
+    for idx, value in enumerate(enclosed_wires):
+        if not value: # Means the wire is not enclosed by other wires
+            max_wires.append(l_wires[idx])
+
+    return max_wires
+
