@@ -31,6 +31,9 @@ def get_pcap_area_bound():
 def get_pcap_layer_of_botsilk():
     return get_param("prefPCAPLayerOfBotsilk")
 
+def get_pcap_layer_of_botpaste():
+    return get_param("prefPCAPLayerOfBotpaste")
+
 def get_pcap_layer_of_botmask():
     return get_param("prefPCAPLayerOfBotmask")
 
