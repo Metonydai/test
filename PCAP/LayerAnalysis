@@ -139,26 +139,43 @@ def bboxCheck(feature1, feature2):
     # return true if BoundBox1 encloses BoundBox2
     return feature1.BoundBox.isInside(feature2.BoundBox)
 
-def featureToClosedWire(grp_list):
+def featureToClosedWire(grp_list, is_layer_silk):
     wire_list=[]
     label_list=[]
-    for feature in grp_list:
-        shape=feature.Shape
-        if shape.Wires != []:
-            wire = shape.Wires[0]
-            if wire.isClosed():
-                # Exclusion of "8"
-                if len(wire.Vertexes) != len(wire.Edges):
-                    continue
-                # Exclusion of "0"
-                if len(wire.Edges) == 20 and all(map(lambda e: e.Length < 0.1, wire.Edges)):
-                    continue
+    if is_layer_silk:
+        for feature in grp_list:
+            shape=feature.Shape
+            if shape.Wires != []:
+                wire = shape.Wires[0]
+                if wire.isClosed():
+                    # Exclusion of "8"
+                    if len(wire.Vertexes) != len(wire.Edges):
+                        continue
+                    # Exclusion of "0"
+                    if len(wire.Edges) == 20 and all(map(lambda e: e.Length < 0.1, wire.Edges)):
+                        continue
+                    # Exclusion of "Q"
+                    #if len(wire.Edges) == 22
+                    # Exclusion of "D"
+                    #if len(wire.Edges) == 13
+                    wire_list.append(wire)
+                    label_list.append(feature.Label+ "_exp")
+            elif shape.isClosed(): # Circle
+                wire = Part.Wire(shape.Edges)
                 wire_list.append(wire)
                 label_list.append(feature.Label+ "_exp")
-        elif shape.isClosed(): # Circle
-            wire = Part.Wire(shape.Edges)
-            wire_list.append(wire)
-            label_list.append(feature.Label+ "_exp")
+    else:
+        for feature in grp_list:
+            shape=feature.Shape
+            if shape.Wires != []:
+                wire = shape.Wires[0]
+                if wire.isClosed():
+                    wire_list.append(wire)
+                    label_list.append(feature.Label+ "_exp")
+            elif shape.isClosed(): # Circle
+                wire = Part.Wire(shape.Edges)
+                wire_list.append(wire)
+                label_list.append(feature.Label+ "_exp")
     return wire_list, label_list
 
 def regionFormed(l_wires):
@@ -203,10 +220,10 @@ def minDist(face_region, inside_wire):
     return min_dist
 
 class Layer():
-    def __init__(self, label):
+    def __init__(self, label, is_layer_silk=False):
         #self.name = name
         self.label = label
-        self.wire_list, self.label_list = featureToClosedWire(self.getLayer().Group)
+        self.wire_list, self.label_list = featureToClosedWire(self.getLayer().Group, is_layer_silk)
         self.face_list = []
         self.depth = self.getDepth()
 
