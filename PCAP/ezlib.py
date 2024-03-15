@@ -32,7 +32,7 @@ class BVHAccel:
         self.m_splitMethod = splitMethod.NAIVE
         start = time()
         if len(self.m_ents) == 0:
-            return BVHBuildNode()
+            return None
 
         self.root = self._recursiveBuild(self.m_ents)
         stop = time()
@@ -58,11 +58,29 @@ class BVHAccel:
                 return None
 
             # end connect start
-            if node.object.Vertexes[0].isclose(myEnt.Vertexes[end]):
+            if node.object.Vertexes[0].isclose(myEnt.Vertexes[end]) and not node.object.joined:
+                if node.object.Vertexes[-1].isclose(myEnt.Vertexes[st]): #if myEnt start connect find_ent end
+                    # To exclude the conditon that e1 and e2 are essentially lines
+                    e1 = node.object.m_entity
+                    e2 = myEnt.m_entity
+                    if e1.dxftype() == "LINE" and e2.dxftype() == "LINE":
+                        return None
+                    if e1.dxftype() == "LWPOLYLINE" and e2.dxftype() == "LWPOLYLINE": 
+                        if all([v[4]==0.0 for v in e1.get_points()]) and all([v[4]==0.0 for v in e2.get_points()]): #e1 and e2 all vertexes value equal 0.0 -> line
+                            return None
                 return node.object
             
             # end connect end
-            elif node.object.Vertexes[-1].isclose(myEnt.Vertexes[end]):
+            elif node.object.Vertexes[-1].isclose(myEnt.Vertexes[end]) and not node.object.joined:
+                if node.object.Vertexes[0].isclose(myEnt.Vertexes[st]): #if myEnt start connect find_ent start
+                    # To exclude the conditon that e1 and e2 are essentially lines
+                    e1 = node.object.m_entity
+                    e2 = myEnt.m_entity
+                    if e1.dxftype() == "LINE" and e2.dxftype() == "LINE":
+                        return None
+                    if e1.dxftype() == "LWPOLYLINE" and e2.dxftype() == "LWPOLYLINE": 
+                        if all([v[4]==0.0 for v in e1.get_points()]) and all([v[4]==0.0 for v in e2.get_points()]): #e1 and e2 all vertexes value equal 0.0 -> line
+                            return None
                 node.object.reverse = True
                 return node.object
 
@@ -78,9 +96,9 @@ class BVHAccel:
             return self.getNextEntity(node.right, myEnt)
         elif point_in_left and point_in_right:
             if node.left.bounds.inside(myEnt.Vertexes[st]): # myEnt start_point in node.left
-                return self.getNextEntity(node.right, myEnt) or self.getNextEntity(node.left, myEnt)
-            else:
                 return self.getNextEntity(node.left, myEnt) or self.getNextEntity(node.right, myEnt)
+            else:
+                return self.getNextEntity(node.right, myEnt) or self.getNextEntity(node.left, myEnt)
 
         return None
 
@@ -104,11 +122,29 @@ class BVHAccel:
                 return None
 
             # end connect start
-            if node.object.Vertexes[-1].isclose(myEnt.Vertexes[st]):
+            if node.object.Vertexes[-1].isclose(myEnt.Vertexes[st]) and not node.object.joined:
+                if node.object.Vertexes[0].isclose(myEnt.Vertexes[end]): #if myEnt end connect find_ent start
+                    # To exclude the conditon that e1 and e2 are essentially lines
+                    e1 = node.object.m_entity
+                    e2 = myEnt.m_entity
+                    if e1.dxftype() == "LINE" and e2.dxftype() == "LINE":
+                        return None
+                    if e1.dxftype() == "LWPOLYLINE" and e2.dxftype() == "LWPOLYLINE": 
+                        if all([v[4]==0.0 for v in e1.get_points()]) and all([v[4]==0.0 for v in e2.get_points()]): #e1 and e2 all vertexes value equal 0.0 -> line
+                            return None
                 return node.object
             
             # start connect start
-            elif node.object.Vertexes[0].isclose(myEnt.Vertexes[st]):
+            elif node.object.Vertexes[0].isclose(myEnt.Vertexes[st]) and not node.object.joined:
+                if node.object.Vertexes[-1].isclose(myEnt.Vertexes[end]): #if myEnt end connect find_ent end
+                    # To exclude the conditon that e1 and e2 are essentially lines
+                    e1 = node.object.m_entity
+                    e2 = myEnt.m_entity
+                    if e1.dxftype() == "LINE" and e2.dxftype() == "LINE":
+                        return None
+                    if e1.dxftype() == "LWPOLYLINE" and e2.dxftype() == "LWPOLYLINE": 
+                        if all([v[4]==0.0 for v in e1.get_points()]) and all([v[4]==0.0 for v in e2.get_points()]): #e1 and e2 all vertexes value equal 0.0 -> line
+                            return None
                 node.object.reverse = True
                 return node.object
 
@@ -124,9 +160,9 @@ class BVHAccel:
             return self.getPreviousEntity(node.right, myEnt)
         elif point_in_left and point_in_right:
             if node.left.bounds.inside(myEnt.Vertexes[end]): # myEnt end_point in node.left
-                return self.getPreviousEntity(node.right, myEnt) or self.getPreviousEntity(node.left, myEnt)
-            else:
                 return self.getPreviousEntity(node.left, myEnt) or self.getPreviousEntity(node.right, myEnt)
+            else:
+                return self.getPreviousEntity(node.right, myEnt) or self.getPreviousEntity(node.left, myEnt)
 
         return None
     
@@ -179,6 +215,7 @@ def ezJoinPolys(entities):
         poly_is_closed = False
         polys = []
         polys.append(entities[i])
+        entities[i].joined = True
         nextEntity = bvh.findNextEntity(polys)
         while nextEntity != None and (not nextEntity.joined):
             # Check if nextEntity and polys[0] form closed polyline
@@ -281,7 +318,7 @@ def ezprocessdxf(dxfdoc, sel_layer, mydoc=None):
 
     # copy sel_layer to tmpdoc and deal with entities
     for l in sel_layer:
-        tmpdoc.layers.add(name=l, color=dxfdoc.layers.get(l).dxf.color)
+        tmpdoc.layers.add(name=l, color=abs(dxfdoc.layers.get(l).dxf.color))
 
         # deal with entities
         entities = []
@@ -290,8 +327,10 @@ def ezprocessdxf(dxfdoc, sel_layer, mydoc=None):
                 tmpmsp.add_foreign_entity(e)
             
             elif e.dxftype() == 'LINE':
-                entity = myEntity(e)
-                entities.append(entity)
+                # start and end not coincident
+                if hash(e.dxf.start) != hash(e.dxf.end):
+                    entity = myEntity(e)
+                    entities.append(entity)
 
             elif e.dxftype() == 'ARC':
                 entity = myEntity(e)
@@ -299,11 +338,40 @@ def ezprocessdxf(dxfdoc, sel_layer, mydoc=None):
 
             elif e.dxftype() == 'LWPOLYLINE':
                 if e.is_closed or Vec2(e.get_points('xy')[0]).isclose(Vec2(e.get_points('xy')[-1])):
-                    e.close(True)
-                    tmpmsp.add_foreign_entity(e)
+                    if all([hash(pt) == hash(e.get_points('xy')[0]) for pt in e.get_points('xy')[1::]]): #exclude point polyline
+                        pass
+                    else:
+                        e.close(True)
+                        tmpmsp.add_foreign_entity(e)
                 else:
                     entity = myEntity(e)
                     entities.append(entity)
+
+            elif e.dxftype() == 'INSERT':
+                # break the block to entities
+                for be in e.virtual_entities():
+                    be.dxf.layer=l # set every be in layer l
+                    if be.dxftype() == 'CIRCLE':
+                        tmpmsp.add_foreign_entity(be)
+                    
+                    elif be.dxftype() == 'LINE':
+                        entity = myEntity(be)
+                        entities.append(entity)
+
+                    elif be.dxftype() == 'ARC':
+                        entity = myEntity(be)
+                        entities.append(entity)
+
+                    elif be.dxftype() == 'LWPOLYLINE':
+                        if be.is_closed or Vec2(be.get_points('xy')[0]).isclose(Vec2(be.get_points('xy')[-1])):
+                            if all([hash(pt) == hash(be.get_points('xy')[0]) for pt in be.get_points('xy')[1::]]): #exclude point polyline
+                                pass
+                            else:
+                                be.close(True)
+                                tmpmsp.add_foreign_entity(be)
+                        else:
+                            entity = myEntity(be)
+                            entities.append(entity)
             
             else:
                 pass
@@ -318,6 +386,9 @@ def ezprocessdxf(dxfdoc, sel_layer, mydoc=None):
         for poly in sorted_entities:
             ezaddEntity(poly, tmpmsp, l)
 
+    #output_path = "C:\\Users\\Tony.dai\\Desktop\\fixture\\new_issue\\DDC需求資料\\loveHuiyu.dxf"
+    #tmpdoc.saveas(output_path)
+
     FreeCADGui.updateGui()
     # ======= Draw tmpdoc in FreeCAD =======
     # Obtain the layers in tmpdoc
@@ -327,49 +398,61 @@ def ezprocessdxf(dxfdoc, sel_layer, mydoc=None):
 
     # Traverse through each layer in tmpdoc
     for ezlay in ezlayers: 
+        FCC.PrintMessage("Drawing layer : " + ezlay.dxf.name + " in FreeCAD\n")
+        FreeCADGui.updateGui()
+
         # Query for LWPOLYLINE
         polylines = tmpmsp.query('LWPOLYLINE[layer=="' + ezlay.dxf.name + '"]')
         if polylines:
-            FCC.PrintMessage("Drawing " + str(len(polylines)) + " polylines...\n")
+            FCC.PrintMessage("---Drawing " + str(len(polylines)) + " polylines...\n")
 
         num = 0
         for polyline in polylines:
             shape = ezdrawPolyline(polyline, num)
-            newob = ezaddObject(shape, mydoc, "Polyline", ezlay)
-            num += 1
+            if shape:
+                newob = ezaddObject(shape, mydoc, "Polyline", ezlay)
+                num += 1
 
         # Query for LINE
         lines = tmpmsp.query('LINE[layer=="' + ezlay.dxf.name + '"]')
         if lines:
-            FCC.PrintMessage("Drawing " + str(len(lines)) + " lines...\n")
+            FCC.PrintMessage("---Drawing " + str(len(lines)) + " lines...\n")
 
         num = 0
         for line in lines:
             shape = ezdrawLine(line)
-            newob = ezaddObject(shape, mydoc, "Line", ezlay)
-            num += 1
+            if shape:
+                newob = ezaddObject(shape, mydoc, "Line", ezlay)
+                num += 1
 
         # Query for ARC
         arcs = tmpmsp.query('ARC[layer=="' + ezlay.dxf.name + '"]')
         if arcs:
-            FCC.PrintMessage("Drawing " + str(len(arcs)) + " arcs...\n")
+            FCC.PrintMessage("---Drawing " + str(len(arcs)) + " arcs...\n")
 
         num = 0
         for arc in arcs:
             shape = ezdrawArc(arc)
-            newob = ezaddObject(shape, mydoc, "Arc", ezlay)
-            num += 1
+            if shape:
+                newob = ezaddObject(shape, mydoc, "Arc", ezlay)
+                num += 1
 
         # Query for CIRCLE
         circles = tmpmsp.query('CIRCLE[layer=="' + ezlay.dxf.name + '"]')
-        if circles:
-            FCC.PrintMessage("Drawing " + str(len(arcs)) + " circles...\n")
+        if circles: 
+            FCC.PrintMessage("---Drawing " + str(len(circles)) + " circles...\n")
 
         num = 0
         for circle in circles:
             shape = ezdrawCircle(circle)
-            newob = ezaddObject(shape, mydoc, "Circle", ezlay)
-            num += 1
+            if shape:
+                newob = ezaddObject(shape, mydoc, "Circle", ezlay)
+                num += 1
+
+        if not polylines and not lines and not arcs and not circles:
+            lay_color = tuple( i/255 for i in ezdxf.colors.aci2rgb(ezlay.color))
+            lay = ezlocateLayer(ezlay.dxf.name, mydoc, lay_color, "Solid")
+
 
     # Finishing
     print("done processing")
@@ -378,13 +461,17 @@ def ezprocessdxf(dxfdoc, sel_layer, mydoc=None):
     print("recompute done")
 
     FCC.PrintMessage("successfully imported.\n")
+    FreeCADGui.updateGui()
 
 def ezaddEntity(ent_list, tmpmsp, l):
+    # Draw one poly at one time
     if len(ent_list) == 1:
         e = ent_list[0].m_entity
         tmpmsp.add_foreign_entity(e)
     else:
         vertexes = []
+        line_width = 0
+        set_width = False
 
         # Add start vertex to vertexes!
         for myEnt in ent_list:
@@ -404,10 +491,16 @@ def ezaddEntity(ent_list, tmpmsp, l):
                     vertexes.append((myEnt.Vertexes[start].x, myEnt.Vertexes[start].y,0,0,-ezgetBulge(e)))
 
             elif e.dxftype() == 'LWPOLYLINE':
+                if not set_width:
+                    line_width = e.dxf.const_width
+                    set_width = True
                 if myEnt.reverse == False:
                     vertexes += e.get_points()[:-1:]
                 else:
-                    vertexes += e.get_points()[::-1][:-1:]
+                    pts = e.get_points()
+                    m = len(pts)
+                    rev_pts = [(pts[m-i-1][0], pts[m-i-1][1], pts[m-i-1][3], pts[m-i-1][2], -pts[m-i-2][4]) for i in range(m)]
+                    vertexes += rev_pts[:-1:]
 
         # Obtain is_poly_closed
         is_poly_closed = False
@@ -430,7 +523,7 @@ def ezaddEntity(ent_list, tmpmsp, l):
             #Add last_end Vertexes[end]
             vertexes.append((last_ent.Vertexes[end].x, myEnt.Vertexes[end].y))
 
-        tmpmsp.add_lwpolyline(vertexes, close=is_poly_closed, dxfattribs={"layer": l})
+        tmpmsp.add_lwpolyline(vertexes, close=is_poly_closed, dxfattribs={"layer" : l, "const_width" : line_width,})
 
 def ezgetBulge(arc):
     span_angle = arc_angle_span_deg(arc.dxf.start_angle, arc.dxf.end_angle)
@@ -481,7 +574,7 @@ def ezvec(pt, z0=None):
     return v
 
 def ezdrawPolyline(polyline, num=None):
-    if len(polyline) > 1: # not a "point"
+    if len(polyline) > 1:
         edges = []
         curves = False
         verts = []
@@ -576,18 +669,17 @@ def ezdrawPolyline(polyline, num=None):
     return None
 
 def ezdrawLine(line):
-    if len(line.points) > 1:
-        v1 = ezvec(line.dxf.start)
-        v2 = ezvec(line.dxf.end)
-        if not DraftVecUtils.equals(v1, v2):
-            try:
-                if (dxfCreateDraft or dxfCreateSketch):
-                    return Draft.makeWire([v1, v2])
-                else:
-                    return Part.LineSegment(v1, v2).toShape()
-            except Part.OCCError:
-                pass
-                #importDXF.warn(line)
+    v1 = ezvec(line.dxf.start)
+    v2 = ezvec(line.dxf.end)
+    if not DraftVecUtils.equals(v1, v2):
+        try:
+            if (dxfCreateDraft or dxfCreateSketch):
+                return Draft.makeWire([v1, v2])
+            else:
+                return Part.LineSegment(v1, v2).toShape()
+        except Part.OCCError:
+            pass
+            #importDXF.warn(line)
     return None   
 
 def ezdrawArc(arc):
@@ -615,7 +707,7 @@ def ezdrawArc(arc):
 def ezdrawCircle(circle):
     v = ezvec(circle.dxf.center)
     curve = Part.Circle()
-    curve.Radius = ezvec(circle.radius)
+    curve.Radius = ezvec(circle.dxf.radius)
     curve.Center = v
     try:
         if (dxfCreateDraft or dxfCreateSketch):
