@@ -353,7 +353,7 @@ def findGroove(wire, tangents):
 
     return idxes, ccw
 
-def run():
+def run_router():
     #===================================================
     # Function 1
     #===================================================
@@ -377,11 +377,31 @@ def run():
     output_file_path = os.path.join(output_folder, "final_result.dwg")
 
     # Initialize Custom Layer Object
-    layer_selected_list = []
-    if pcaplib.get_pcap_dxf_layers() == "":
+    if not pcaplib.get_pcap_dxf_layers():
         App.Console.PrintWarning("Please select the layers and then press the \"Save Setting\" button!\n")
         return -1
+    
+    if not pcaplib.get_pcap_layer_of_botsilk():
+        App.Console.PrintWarning("Cannot find Layer botsilk.\n")
+        return -1
 
+    if not pcaplib.get_pcap_layer_of_botpaste():
+        App.Console.PrintWarning("Cannot find Layer botpaste.\n")
+        return -1
+
+    if not pcaplib.get_pcap_layer_of_botmask():
+        App.Console.PrintWarning("Cannot find Layer botmask.\n")
+        return -1
+
+    if not pcaplib.get_pcap_layer_of_open():
+        App.Console.PrintWarning("Cannot find Layer OPEN.\n")
+        return -1
+        
+    if not pcaplib.get_pcap_layer_of_botmask():
+        App.Console.PrintWarning("Cannot find Layer board_pocket.\n")
+        return -1
+
+    layer_selected_list = []
     for layer_label in pcaplib.get_pcap_dxf_layers().split(','):
         #print(layer_label)
         layer_selected_list.append(Layer(layer_label))
@@ -394,48 +414,39 @@ def run():
 
     # Initialize layer botsilk, botmask, OPEN, PCB_2.5 and Check their Group() 
     # Create botsilk Layer
-    if pcaplib.get_pcap_layer_of_botsilk():
-        botsilk = Layer(pcaplib.get_pcap_layer_of_botsilk())
-        botsilk.createFace(overlap_check=False)
-        if botsilk.getLayer().Group == []:
-            botsilk = Layer(pcaplib.get_pcap_layer_of_botmask())
-            botsilk.createFace(overlap_check=False)
-            App.Console.PrintWarning("Layer botsilk is empty. Use botmask layer to analyze.\n")
-    else:
-        App.Console.PrintWarning("Cannot find Layer botsilk.\n")
+    botsilk = Layer(pcaplib.get_pcap_layer_of_botsilk())
+    botsilk.createFace(overlap_check=False)
+    if botsilk.getLayer().Group == []:
+        App.Console.PrintWarning("Layer botsilk is empty. Please check the DXF file.\n")
+        return -1
+
+    # Create botpaste Layer
+    botpaste = Layer(pcaplib.get_pcap_layer_of_botpaste())
+    botpaste.createFace(overlap_check=False)
+    if botpaste.getLayer().Group == []:
+        App.Console.PrintWarning("Layer botpaste is empty. Please check the DXF file.\n")
         return -1
 
     # Create botmask Layer
-    if pcaplib.get_pcap_layer_of_botmask():
-        botmask = Layer(pcaplib.get_pcap_layer_of_botmask())
-        botmask.createFace(overlap_check=False)
+    botmask = Layer(pcaplib.get_pcap_layer_of_botmask())
+    botmask.createFace(overlap_check=False)
 
-        if botmask.getLayer().Group == []:
-            App.Console.PrintWarning("Layer botmask is empty. Please check the DXF file.\n")
-            return -1
-    else:
-        App.Console.PrintWarning("Cannot find Layer botmask.\n")
+    if botmask.getLayer().Group == []:
+        App.Console.PrintWarning("Layer botmask is empty. Please check the DXF file.\n")
         return -1
 
-    #===================================
     # Create OPEN Layer
-    if pcaplib.get_pcap_layer_of_open():
-        OPEN = Layer(pcaplib.get_pcap_layer_of_open())
-        OPEN.createFace()
-        if (OPEN.getLayer().Group == []):
-            App.Console.PrintWarning("Layer Open is empty. Please reselect it and play again.\n")
-            return -1
-    #===================================
+    OPEN = Layer(pcaplib.get_pcap_layer_of_open())
+    OPEN.createFace()
+    if (OPEN.getLayer().Group == []):
+        App.Console.PrintWarning("Layer Open is empty. Please reselect it and play again.\n")
+        return -1
 
     # Create board_pocket Layer
-    if pcaplib.get_pcap_layer_of_board_sink(): 
-        board_pocket = Layer(pcaplib.get_pcap_layer_of_board_sink())
-        board_pocket.createFace(overlap_check=False)
-        if board_pocket.getLayer().Group == []:
-            App.Console.PrintWarning("Layer Board Sink is empty. Please reselect it and play again.\n")
-            return -1
-    else:
-        App.Console.PrintWarning("Cannot find Layer board_pocket.\n")
+    board_pocket = Layer(pcaplib.get_pcap_layer_of_board_sink())
+    board_pocket.createFace(overlap_check=False)
+    if board_pocket.getLayer().Group == []:
+        App.Console.PrintWarning("Layer Board Sink is empty. Please reselect it and play again.\n")
         return -1
 
     ## Create layer_export
@@ -460,8 +471,19 @@ def run():
     botsilk_bbox = botsilk.getLayer().Shape.BoundBox
     quad_tree = QuadTree(botsilk_bbox.XMin, botsilk_bbox.YMin, botsilk_bbox.XMax, botsilk_bbox.YMax)
 
-    # Insert Node in quad_tree
+    # Insert Node in quad_tree (botsilk)
     for wire, face, label in zip(botsilk.wire_list, botsilk.face_list, botsilk.label_list):
+        point = Point(wire, face, label)
+        # Set all circle check == True
+        if len(point.wire.Edges) == 1:
+                point.check = True
+        # Set all point's Area >= area_bound check == True
+        if point.face.Area >= area_bound:
+            point.check = True
+        quad_tree.insert(point)
+
+    # Insert Node in quad_tree (botpaste)
+    for wire, face, label in zip(botpaste.wire_list, botpaste.face_list, botpaste.label_list):
         point = Point(wire, face, label)
         # Set all circle check == True
         if len(point.wire.Edges) == 1:
@@ -505,6 +527,8 @@ def run():
     layer_problem_interference.Label = "[ERROR]Interference without Grooving".format(dr)
     export_list.append(layer_problem_interference)
 
+    # del quad_tree
+    del quad_tree
     #===================================================
     # Function 2: Print All Component In Open And THRU
     #===================================================
@@ -532,7 +556,7 @@ def run():
     botmask_bbox = botmask.getLayer().Shape.BoundBox
     quad_tree_1 = QuadTree(botmask_bbox.XMin, botmask_bbox.YMin, botmask_bbox.XMax, botmask_bbox.YMax)
 
-    # Insert Node in quad_tree
+    # Insert Node in quad_tree (botmask)
     for wire, face, label in zip(botmask.wire_list, botmask.face_list, botmask.label_list):
         quad_tree_1.insert(Point(wire, face, label))
 
@@ -634,6 +658,1189 @@ def run():
     layer_boardGapTooClose.Label = "[ERROR]Fixture Board Gap Less Than {}mm".format(d_board)
     export_list.append(layer_boardGapTooClose)
 
+    del quad_tree_1
+    #===================================================
+    # Function 4 : Thru Thickness to thin
+    #===================================================
+    do = float(pcaplib.get_pcap_do())
+    slice_len = 2
+
+    # Create quad_tree_2
+    quad_tree_2 = QuadTree(botmask_bbox.XMin, botmask_bbox.YMin, botmask_bbox.XMax, botmask_bbox.YMax)
+
+    for i, layer in enumerate(layer_selected_list):
+        for j, wire in enumerate(layer.wire_list):
+            pts = wire.discretize(int(wire.Length/slice_len)+ 1)
+            # insert pts in QuadTree
+            for pt in pts[:-1]:
+                quad_tree_2.insert(Point2(pt, i, j))
+
+    # Start to Check for wire in OPEN
+    open_gap_too_close = []
+    for w in OPEN.wire_list:
+        check_bbox = App.BoundBox(w.BoundBox.XMin-do, w.BoundBox.YMin-do, 0, w.BoundBox.XMax+do, w.BoundBox.YMax+do, 0)
+        check = query_range(quad_tree_2, check_bbox)
+        # Obtain check_set
+        check_set = set()
+        for pt2 in check:
+            check_set.add((pt2.layer_idx, pt2.wire_idx))
+        # gap check
+        for (i, j) in check_set:
+            open_gap_too_close.extend(gapCheck(w, layer_selected_list[i].wire_list[j], do))
+
+    # Change Color
+    for m in open_gap_too_close:
+        m.ViewObject.LineColor = error_line_color
+
+    # Create layer_openGapTooClose
+    layer_openGapTooClose = App.ActiveDocument.addObject('App::DocumentObjectGroup', 'ERROR_Thru_thickness')
+    layer_openGapTooClose.Group = open_gap_too_close
+    layer_openGapTooClose.Label = "[ERROR]Thru Thickness Less Than {}mm".format(do)
+    export_list.append(layer_openGapTooClose)
+
+    #===================================================
+    # Function 5 : Check for Connect_Groove
+    #===================================================
+    dl = float(pcaplib.get_pcap_dl())
+    dw = float(pcaplib.get_pcap_dw())
+
+    tangents = [App.Vector(1,0,0), App.Vector(-1,0,0), App.Vector(0,1,0), App.Vector(0,-1,0)]
+
+    func5_result=[]
+    for l_wire, board_obj in pair_board_objs:
+        idxes, ccw = findGroove(l_wire, tangents)
+        L = len(l_wire.Edges)
+        edges = l_wire.Edges
+        for idx in idxes:
+            Vl1 = edges[idx].Vertex2.Point
+            Vl2 = edges[(idx+8)%L].Vertex1.Point
+            dl_check = Vl1.distanceToPoint(Vl2)
+            dw_check = board_obj.Shape.distToShape(edges[(idx+4)%L].Vertex1)[0]
+            if dl_check < dl:
+                func5_result.append(formObject(Part.makeLine(Vl1, Vl2)))
+            if dw_check < dw:
+                rot = App.Matrix(0,-1,0,0,1,0,0,0,0,0,1,0,0,0,0,1)
+                t = edges[(idx+4)%L].tangentAt(0)
+                t = rot.multVec(t)
+                Vwmid = (edges[(idx+4)%L].Vertex1.Point+ edges[(idx+4)%L].Vertex2.Point)/2
+                Vw2 = Vwmid+ ccw*dw_check*t
+                func5_result.append(formObject(Part.makeLine(Vwmid, Vw2)))
+
+    # Change Color
+    for m in func5_result:
+        m.ViewObject.LineColor = error_line_color
+
+    # Create layer_errorConnectGroove
+    layer_errorConnectGroove = App.ActiveDocument.addObject('App::DocumentObjectGroup', 'ERROR_ConnectGroove')
+    layer_errorConnectGroove.Group = func5_result
+    layer_errorConnectGroove.Label = "[ERROR]Connect Groove Dimension Violation"
+    export_list.append(layer_errorConnectGroove)
+
+    #===================================================
+    # Export DWG
+    #===================================================
+    import importDWG
+    importDWG.export(export_list,output_file_path)
+    # Reset the parameter PrefPCAPLayers
+    pcaplib.set_param("prefPCAPLayers", "")
+    end=time()
+
+    App.Console.PrintMessage("t = {}s\n".format(end- start))
+
+def run_unloader():
+    #===================================================
+    # Function 1
+    #===================================================
+    # Set distance and area_bound
+    start = time()
+
+    # Assuming filePath is defined earlier
+    # importDXF.open(filePath)
+
+    # Get values from pcaplib
+    dr = float(pcaplib.get_pcap_dr())
+
+    # Set default values
+    area_bound = float(pcaplib.get_pcap_area_bound())
+
+    # Determine the output folder
+    filePath = pcaplib.get_pcap_dxf_file_path()
+    output_folder = pcaplib.get_pcap_output_folder() or os.path.dirname(os.path.abspath(filePath))
+
+    # Construct the output file path using os.path.join
+    output_file_path = os.path.join(output_folder, "final_result.dwg")
+
+    # Initialize Custom Layer Object
+    if not pcaplib.get_pcap_dxf_layers():
+        App.Console.PrintWarning("Please select the layers and then press the \"Save Setting\" button!\n")
+        return -1
+    
+    if not pcaplib.get_pcap_layer_of_botsilk():
+        App.Console.PrintWarning("Cannot find Layer botsilk.\n")
+        return -1
+
+    if not pcaplib.get_pcap_layer_of_botpaste():
+        App.Console.PrintWarning("Cannot find Layer botpaste.\n")
+        return -1
+
+    if not pcaplib.get_pcap_layer_of_botmask():
+        App.Console.PrintWarning("Cannot find Layer botmask.\n")
+        return -1
+
+    if not pcaplib.get_pcap_layer_of_open():
+        App.Console.PrintWarning("Cannot find Layer OPEN.\n")
+        return -1
+        
+    if not pcaplib.get_pcap_layer_of_botmask():
+        App.Console.PrintWarning("Cannot find Layer board_pocket.\n")
+        return -1
+
+    layer_selected_list = []
+    for layer_label in pcaplib.get_pcap_dxf_layers().split(','):
+        #print(layer_label)
+        layer_selected_list.append(Layer(layer_label))
+
+    # Sorted in layer.depth
+    layer_selected_list.sort(key=lambda layer: layer.depth, reverse=True)
+
+    # Create an export_list
+    export_list = []
+
+    # Initialize layer botsilk, botmask, OPEN, PCB_2.5 and Check their Group() 
+    # Create botsilk Layer
+    botsilk = Layer(pcaplib.get_pcap_layer_of_botsilk())
+    botsilk.createFace(overlap_check=False)
+    if botsilk.getLayer().Group == []:
+        App.Console.PrintWarning("Layer botsilk is empty. Please check the DXF file.\n")
+        return -1
+
+    # Create botpaste Layer
+    botpaste = Layer(pcaplib.get_pcap_layer_of_botpaste())
+    botpaste.createFace(overlap_check=False)
+    if botpaste.getLayer().Group == []:
+        App.Console.PrintWarning("Layer botpaste is empty. Please check the DXF file.\n")
+        return -1
+
+    # Create botmask Layer
+    botmask = Layer(pcaplib.get_pcap_layer_of_botmask())
+    botmask.createFace(overlap_check=False)
+
+    if botmask.getLayer().Group == []:
+        App.Console.PrintWarning("Layer botmask is empty. Please check the DXF file.\n")
+        return -1
+
+    # Create OPEN Layer
+    OPEN = Layer(pcaplib.get_pcap_layer_of_open())
+    OPEN.createFace()
+    if (OPEN.getLayer().Group == []):
+        App.Console.PrintWarning("Layer Open is empty. Please reselect it and play again.\n")
+        return -1
+
+    # Create board_pocket Layer
+    board_pocket = Layer(pcaplib.get_pcap_layer_of_board_sink())
+    board_pocket.createFace(overlap_check=False)
+    if board_pocket.getLayer().Group == []:
+        App.Console.PrintWarning("Layer Board Sink is empty. Please reselect it and play again.\n")
+        return -1
+
+    ## Create layer_export
+    #for layer in layer_selected_list:
+    #    
+    #    #obtain layer property
+    #    #line_color
+    #    if (layer.getLayer().Group != []):
+    #        line_color = layer.getLayer().Group[0].ViewObject.LineColor
+
+    #    # Add Document
+    #    new_layer = App.ActiveDocument.addObject('App::DocumentObjectGroup', layer.label+ '_exp')
+    #    export_list.append(new_layer)
+    #    new_layer.Label = layer.label+ '_exp'
+    #    new_layer.Group = new_layer_wire
+
+    # Direct Output, since ezlib join directly
+    for layer in layer_selected_list:
+        export_list.append(layer.getLayer())
+
+    # Determine the Range and Create QuadTreeNode
+    botsilk_bbox = botsilk.getLayer().Shape.BoundBox
+    quad_tree = QuadTree(botsilk_bbox.XMin, botsilk_bbox.YMin, botsilk_bbox.XMax, botsilk_bbox.YMax)
+
+    # Insert Node in quad_tree (botsilk)
+    for wire, face, label in zip(botsilk.wire_list, botsilk.face_list, botsilk.label_list):
+        point = Point(wire, face, label)
+        # Set all circle check == True
+        if len(point.wire.Edges) == 1:
+                point.check = True
+        # Set all point's Area >= area_bound check == True
+        if point.face.Area >= area_bound:
+            point.check = True
+        quad_tree.insert(point)
+
+    # Insert Node in quad_tree (botpaste)
+    for wire, face, label in zip(botpaste.wire_list, botpaste.face_list, botpaste.label_list):
+        point = Point(wire, face, label)
+        # Set all circle check == True
+        if len(point.wire.Edges) == 1:
+                point.check = True
+        # Set all point's Area >= area_bound check == True
+        if point.face.Area >= area_bound:
+            point.check = True
+        quad_tree.insert(point)
+
+    # Start to detect
+    error_line_color = (1.0, 1.0, 0.0)
+    error_shape_color = (1.0, 0.0, 0.0)
+
+    point_list = checkForProblem(layer_selected_list, quad_tree, dr, area_bound)
+
+    problem_list = []
+    for point in point_list:
+        problem = formObject(point.face, point.label)
+        problem.ViewObject.LineColor = error_line_color
+        problem.ViewObject.ShapeColor = error_shape_color
+        problem_list.append(problem)
+
+    # Create layer_problem
+    layer_problem = App.ActiveDocument.addObject('App::DocumentObjectGroup', 'Problem')
+    layer_problem.Group = problem_list
+    layer_problem.Label = "[ERROR]Interference Within {}mm".format(dr)
+    export_list.append(layer_problem)
+
+    # New function: query for quad_tree to find point.check is False
+    not_check_list = query_not_checked(quad_tree)
+    problem_list = []
+    for point in not_check_list:
+        problem = formObject(point.face, point.label)
+        problem.ViewObject.LineColor = error_line_color
+        problem.ViewObject.ShapeColor = error_shape_color
+        problem_list.append(problem)
+
+    # Create layer_problem_interference
+    layer_problem_interference = App.ActiveDocument.addObject('App::DocumentObjectGroup', 'Problem_Interference')
+    layer_problem_interference.Group = problem_list
+    layer_problem_interference.Label = "[ERROR]Interference without Grooving".format(dr)
+    export_list.append(layer_problem_interference)
+
+    # del quad_tree
+    del quad_tree
+    #===================================================
+    # Function 2: Print All Component In Open And THRU
+    #===================================================
+    ## Get OPEN_color
+    #OPEN_color = OPEN.getLayer().Group[0].ViewObject.LineColor
+
+    ## Add Document
+    #new_layer = App.ActiveDocument.addObject('App::DocumentObjectGroup', OPEN.label+ '_exp')
+    #export_list.append(new_layer)
+    #new_layer.Label = OPEN.label+ '_exp'
+
+    #new_layer_wire=[]
+    #for wire, label in zip(OPEN.wire_list, OPEN.label_list):
+    #    obj_wire=formObject(wire, label)
+    #    obj_wire.ViewObject.LineColor=OPEN_color
+    #    new_layer_wire.append(obj_wire)
+
+    #new_layer.Group = new_layer_wire
+    #export_list.append(new_layer)
+
+    # Direct Output, since ezlib join directly
+    export_list.append(OPEN.getLayer())
+
+    # Determine the Range and Create QuadTreeNode
+    botmask_bbox = botmask.getLayer().Shape.BoundBox
+    quad_tree_1 = QuadTree(botmask_bbox.XMin, botmask_bbox.YMin, botmask_bbox.XMax, botmask_bbox.YMax)
+
+    # Insert Node in quad_tree (botmask)
+    for wire, face, label in zip(botmask.wire_list, botmask.face_list, botmask.label_list):
+        quad_tree_1.insert(Point(wire, face, label))
+
+    # Start to Detect
+    tolerance = 0.00001
+    result_open = []
+    for l_face in OPEN.face_list:
+        included = query_range(quad_tree_1, l_face.BoundBox)
+        for point in included:
+            # Already Checked
+            if point.check == True:
+                continue
+            # Area Check
+            if point.face.Area >= area_bound:
+                point.check = True
+                continue
+            # Inside Check
+            if not l_face.isInside(point.wire.CenterOfMass, 0.0, True):
+                continue
+
+            point.check = True
+            if len(point.wire.Edges) == 1:
+                vec = point.wire.Vertex1.Point- point.wire.CenterOfMass
+                r = sqrt(vec.dot(vec))
+                c = Part.makeCircle(r, point.wire.CenterOfMass)
+                c_wire = Part.Wire(c)
+                c_face = Part.Face(c_wire)
+                shade_area = formObject(c_face, point.label)
+            else:
+                shade_area = formObject(point.face, point.label)
+
+            # Distance Check For line_color only
+            if minDist(l_face, point.wire) < dr-tolerance:
+                shade_area.ViewObject.LineColor = error_line_color
+                shade_area.ViewObject.ShapeColor = error_shape_color
+            else:
+                shade_area.ViewObject.LineColor = (1.0, 1.0, 1.0)
+                #shade_area.ViewObject.ShapeColor = (1.0, 1.0, 1.0)
+
+            result_open.append(shade_area)
+
+    OPEN_component = App.ActiveDocument.addObject('App::DocumentObjectGroup', 'OPEN_component')
+    OPEN_component.Group = result_open
+    export_list.append(OPEN_component)
+
+    #===================================================
+    # Function 3: the dist. between board and board_pocket
+    #===================================================
+    d_board = float(pcaplib.get_pcap_d_board())
+    #board_pocket_color = board_pocket.getLayer().Group[0].ViewObject.LineColor
+
+    ## Add Document
+    #new_layer = App.ActiveDocument.addObject('App::DocumentObjectGroup', board_pocket.label+ '_exp')
+    #export_list.append(new_layer)
+    #new_layer.Label = board_pocket.label+ '_exp'
+
+    #new_layer_wire=[]
+    #for wire, label in zip(board_pocket.wire_list, board_pocket.label_list):
+    #    obj_wire=formObject(wire, label)
+    #    obj_wire.ViewObject.LineColor=board_pocket_color
+    #    new_layer_wire.append(obj_wire)
+
+    #new_layer.Group = new_layer_wire
+    export_list.append(board_pocket.getLayer())
+
+    pair_board_objs = []
+    board_color = (0.0, 0.0, 1.0)
+
+    fixture_board_too_close = []
+    # Create board_outline
+    for l_wire in board_pocket.wire_list:
+        # Create BoundBox
+        boundary = 10
+        vert1 = App.Vector(l_wire.CenterOfMass.x, l_wire.CenterOfMass.y, 0)- App.Vector(boundary/2, boundary/2, 0)
+        vert2 = App.Vector(l_wire.CenterOfMass.x, l_wire.CenterOfMass.y, 0)+ App.Vector(boundary/2, boundary/2, 0)
+        bbox = App.BoundBox(vert1, vert2)
+        # Query
+        included = query_range(quad_tree_1, bbox)
+        board = getBoard(included, area_bound)
+        if board:
+            show = formObject(board.wire, board.label)
+            show.ViewObject.LineColor = board_color
+            pair_board_objs.append((l_wire, show))
+            for edge in board.wire.Edges:
+                fixture_board_too_close.extend(gapCheck(l_wire, edge, d_board))
+
+    # Create layer_Board
+    Board = App.ActiveDocument.addObject('App::DocumentObjectGroup', 'board')
+    Board.Group = [board_obj for (l_wire, board_obj) in pair_board_objs]
+    export_list.append(Board)
+
+    # Change Color
+    for m in fixture_board_too_close:
+        m.ViewObject.LineColor = error_line_color
+
+    # Create layer_boardGapTooClose
+    layer_boardGapTooClose = App.ActiveDocument.addObject('App::DocumentObjectGroup', 'ERROR_Thru_thickness')
+    layer_boardGapTooClose.Group = fixture_board_too_close
+    layer_boardGapTooClose.Label = "[ERROR]Fixture Board Gap Less Than {}mm".format(d_board)
+    export_list.append(layer_boardGapTooClose)
+
+    del quad_tree_1
+    #===================================================
+    # Function 4 : Thru Thickness to thin
+    #===================================================
+    do = float(pcaplib.get_pcap_do())
+    slice_len = 2
+
+    # Create quad_tree_2
+    quad_tree_2 = QuadTree(botmask_bbox.XMin, botmask_bbox.YMin, botmask_bbox.XMax, botmask_bbox.YMax)
+
+    for i, layer in enumerate(layer_selected_list):
+        for j, wire in enumerate(layer.wire_list):
+            pts = wire.discretize(int(wire.Length/slice_len)+ 1)
+            # insert pts in QuadTree
+            for pt in pts[:-1]:
+                quad_tree_2.insert(Point2(pt, i, j))
+
+    # Start to Check for wire in OPEN
+    open_gap_too_close = []
+    for w in OPEN.wire_list:
+        check_bbox = App.BoundBox(w.BoundBox.XMin-do, w.BoundBox.YMin-do, 0, w.BoundBox.XMax+do, w.BoundBox.YMax+do, 0)
+        check = query_range(quad_tree_2, check_bbox)
+        # Obtain check_set
+        check_set = set()
+        for pt2 in check:
+            check_set.add((pt2.layer_idx, pt2.wire_idx))
+        # gap check
+        for (i, j) in check_set:
+            open_gap_too_close.extend(gapCheck(w, layer_selected_list[i].wire_list[j], do))
+
+    # Change Color
+    for m in open_gap_too_close:
+        m.ViewObject.LineColor = error_line_color
+
+    # Create layer_openGapTooClose
+    layer_openGapTooClose = App.ActiveDocument.addObject('App::DocumentObjectGroup', 'ERROR_Thru_thickness')
+    layer_openGapTooClose.Group = open_gap_too_close
+    layer_openGapTooClose.Label = "[ERROR]Thru Thickness Less Than {}mm".format(do)
+    export_list.append(layer_openGapTooClose)
+
+    #===================================================
+    # Function 5 : Check for Connect_Groove
+    #===================================================
+    dl = float(pcaplib.get_pcap_dl())
+    dw = float(pcaplib.get_pcap_dw())
+
+    tangents = [App.Vector(1,0,0), App.Vector(-1,0,0), App.Vector(0,1,0), App.Vector(0,-1,0)]
+
+    func5_result=[]
+    for l_wire, board_obj in pair_board_objs:
+        idxes, ccw = findGroove(l_wire, tangents)
+        L = len(l_wire.Edges)
+        edges = l_wire.Edges
+        for idx in idxes:
+            Vl1 = edges[idx].Vertex2.Point
+            Vl2 = edges[(idx+8)%L].Vertex1.Point
+            dl_check = Vl1.distanceToPoint(Vl2)
+            dw_check = board_obj.Shape.distToShape(edges[(idx+4)%L].Vertex1)[0]
+            if dl_check < dl:
+                func5_result.append(formObject(Part.makeLine(Vl1, Vl2)))
+            if dw_check < dw:
+                rot = App.Matrix(0,-1,0,0,1,0,0,0,0,0,1,0,0,0,0,1)
+                t = edges[(idx+4)%L].tangentAt(0)
+                t = rot.multVec(t)
+                Vwmid = (edges[(idx+4)%L].Vertex1.Point+ edges[(idx+4)%L].Vertex2.Point)/2
+                Vw2 = Vwmid+ ccw*dw_check*t
+                func5_result.append(formObject(Part.makeLine(Vwmid, Vw2)))
+
+    # Change Color
+    for m in func5_result:
+        m.ViewObject.LineColor = error_line_color
+
+    # Create layer_errorConnectGroove
+    layer_errorConnectGroove = App.ActiveDocument.addObject('App::DocumentObjectGroup', 'ERROR_ConnectGroove')
+    layer_errorConnectGroove.Group = func5_result
+    layer_errorConnectGroove.Label = "[ERROR]Connect Groove Dimension Violation"
+    export_list.append(layer_errorConnectGroove)
+
+    #===================================================
+    # Export DWG
+    #===================================================
+    import importDWG
+    importDWG.export(export_list,output_file_path)
+    # Reset the parameter PrefPCAPLayers
+    pcaplib.set_param("prefPCAPLayers", "")
+    end=time()
+
+    App.Console.PrintMessage("t = {}s\n".format(end- start))
+
+def run_wave():
+    #===================================================
+    # Function 1
+    #===================================================
+    # Set distance and area_bound
+    start = time()
+
+    # Assuming filePath is defined earlier
+    # importDXF.open(filePath)
+
+    # Get values from pcaplib
+    dr = float(pcaplib.get_pcap_dr())
+
+    # Set default values
+    area_bound = float(pcaplib.get_pcap_area_bound())
+
+    # Determine the output folder
+    filePath = pcaplib.get_pcap_dxf_file_path()
+    output_folder = pcaplib.get_pcap_output_folder() or os.path.dirname(os.path.abspath(filePath))
+
+    # Construct the output file path using os.path.join
+    output_file_path = os.path.join(output_folder, "final_result.dwg")
+
+    # Initialize Custom Layer Object
+    if not pcaplib.get_pcap_dxf_layers():
+        App.Console.PrintWarning("Please select the layers and then press the \"Save Setting\" button!\n")
+        return -1
+    
+    if not pcaplib.get_pcap_layer_of_botsilk():
+        App.Console.PrintWarning("Cannot find Layer botsilk.\n")
+        return -1
+
+    if not pcaplib.get_pcap_layer_of_botpaste():
+        App.Console.PrintWarning("Cannot find Layer botpaste.\n")
+        return -1
+
+    if not pcaplib.get_pcap_layer_of_botmask():
+        App.Console.PrintWarning("Cannot find Layer botmask.\n")
+        return -1
+
+    if not pcaplib.get_pcap_layer_of_open():
+        App.Console.PrintWarning("Cannot find Layer OPEN.\n")
+        return -1
+        
+    if not pcaplib.get_pcap_layer_of_botmask():
+        App.Console.PrintWarning("Cannot find Layer board_pocket.\n")
+        return -1
+
+    layer_selected_list = []
+    for layer_label in pcaplib.get_pcap_dxf_layers().split(','):
+        #print(layer_label)
+        layer_selected_list.append(Layer(layer_label))
+
+    # Sorted in layer.depth
+    layer_selected_list.sort(key=lambda layer: layer.depth, reverse=True)
+
+    # Create an export_list
+    export_list = []
+
+    # Initialize layer botsilk, botmask, OPEN, PCB_2.5 and Check their Group() 
+    # Create botsilk Layer
+    botsilk = Layer(pcaplib.get_pcap_layer_of_botsilk())
+    botsilk.createFace(overlap_check=False)
+    if botsilk.getLayer().Group == []:
+        App.Console.PrintWarning("Layer botsilk is empty. Please check the DXF file.\n")
+        return -1
+
+    # Create botpaste Layer
+    botpaste = Layer(pcaplib.get_pcap_layer_of_botpaste())
+    botpaste.createFace(overlap_check=False)
+    if botpaste.getLayer().Group == []:
+        App.Console.PrintWarning("Layer botpaste is empty. Please check the DXF file.\n")
+        return -1
+
+    # Create botmask Layer
+    botmask = Layer(pcaplib.get_pcap_layer_of_botmask())
+    botmask.createFace(overlap_check=False)
+
+    if botmask.getLayer().Group == []:
+        App.Console.PrintWarning("Layer botmask is empty. Please check the DXF file.\n")
+        return -1
+
+    # Create OPEN Layer
+    OPEN = Layer(pcaplib.get_pcap_layer_of_open())
+    OPEN.createFace()
+    if (OPEN.getLayer().Group == []):
+        App.Console.PrintWarning("Layer Open is empty. Please reselect it and play again.\n")
+        return -1
+
+    # Create board_pocket Layer
+    board_pocket = Layer(pcaplib.get_pcap_layer_of_board_sink())
+    board_pocket.createFace(overlap_check=False)
+    if board_pocket.getLayer().Group == []:
+        App.Console.PrintWarning("Layer Board Sink is empty. Please reselect it and play again.\n")
+        return -1
+
+    ## Create layer_export
+    #for layer in layer_selected_list:
+    #    
+    #    #obtain layer property
+    #    #line_color
+    #    if (layer.getLayer().Group != []):
+    #        line_color = layer.getLayer().Group[0].ViewObject.LineColor
+
+    #    # Add Document
+    #    new_layer = App.ActiveDocument.addObject('App::DocumentObjectGroup', layer.label+ '_exp')
+    #    export_list.append(new_layer)
+    #    new_layer.Label = layer.label+ '_exp'
+    #    new_layer.Group = new_layer_wire
+
+    # Direct Output, since ezlib join directly
+    for layer in layer_selected_list:
+        export_list.append(layer.getLayer())
+
+    # Determine the Range and Create QuadTreeNode
+    botsilk_bbox = botsilk.getLayer().Shape.BoundBox
+    quad_tree = QuadTree(botsilk_bbox.XMin, botsilk_bbox.YMin, botsilk_bbox.XMax, botsilk_bbox.YMax)
+
+    # Insert Node in quad_tree (botsilk)
+    for wire, face, label in zip(botsilk.wire_list, botsilk.face_list, botsilk.label_list):
+        point = Point(wire, face, label)
+        # Set all circle check == True
+        if len(point.wire.Edges) == 1:
+                point.check = True
+        # Set all point's Area >= area_bound check == True
+        if point.face.Area >= area_bound:
+            point.check = True
+        quad_tree.insert(point)
+
+    # Insert Node in quad_tree (botpaste)
+    for wire, face, label in zip(botpaste.wire_list, botpaste.face_list, botpaste.label_list):
+        point = Point(wire, face, label)
+        # Set all circle check == True
+        if len(point.wire.Edges) == 1:
+                point.check = True
+        # Set all point's Area >= area_bound check == True
+        if point.face.Area >= area_bound:
+            point.check = True
+        quad_tree.insert(point)
+
+    # Start to detect
+    error_line_color = (1.0, 1.0, 0.0)
+    error_shape_color = (1.0, 0.0, 0.0)
+
+    point_list = checkForProblem(layer_selected_list, quad_tree, dr, area_bound)
+
+    problem_list = []
+    for point in point_list:
+        problem = formObject(point.face, point.label)
+        problem.ViewObject.LineColor = error_line_color
+        problem.ViewObject.ShapeColor = error_shape_color
+        problem_list.append(problem)
+
+    # Create layer_problem
+    layer_problem = App.ActiveDocument.addObject('App::DocumentObjectGroup', 'Problem')
+    layer_problem.Group = problem_list
+    layer_problem.Label = "[ERROR]Interference Within {}mm".format(dr)
+    export_list.append(layer_problem)
+
+    # New function: query for quad_tree to find point.check is False
+    not_check_list = query_not_checked(quad_tree)
+    problem_list = []
+    for point in not_check_list:
+        problem = formObject(point.face, point.label)
+        problem.ViewObject.LineColor = error_line_color
+        problem.ViewObject.ShapeColor = error_shape_color
+        problem_list.append(problem)
+
+    # Create layer_problem_interference
+    layer_problem_interference = App.ActiveDocument.addObject('App::DocumentObjectGroup', 'Problem_Interference')
+    layer_problem_interference.Group = problem_list
+    layer_problem_interference.Label = "[ERROR]Interference without Grooving".format(dr)
+    export_list.append(layer_problem_interference)
+
+    # del quad_tree
+    del quad_tree
+    #===================================================
+    # Function 2: Print All Component In Open And THRU
+    #===================================================
+    ## Get OPEN_color
+    #OPEN_color = OPEN.getLayer().Group[0].ViewObject.LineColor
+
+    ## Add Document
+    #new_layer = App.ActiveDocument.addObject('App::DocumentObjectGroup', OPEN.label+ '_exp')
+    #export_list.append(new_layer)
+    #new_layer.Label = OPEN.label+ '_exp'
+
+    #new_layer_wire=[]
+    #for wire, label in zip(OPEN.wire_list, OPEN.label_list):
+    #    obj_wire=formObject(wire, label)
+    #    obj_wire.ViewObject.LineColor=OPEN_color
+    #    new_layer_wire.append(obj_wire)
+
+    #new_layer.Group = new_layer_wire
+    #export_list.append(new_layer)
+
+    # Direct Output, since ezlib join directly
+    export_list.append(OPEN.getLayer())
+
+    # Determine the Range and Create QuadTreeNode
+    botmask_bbox = botmask.getLayer().Shape.BoundBox
+    quad_tree_1 = QuadTree(botmask_bbox.XMin, botmask_bbox.YMin, botmask_bbox.XMax, botmask_bbox.YMax)
+
+    # Insert Node in quad_tree (botmask)
+    for wire, face, label in zip(botmask.wire_list, botmask.face_list, botmask.label_list):
+        quad_tree_1.insert(Point(wire, face, label))
+
+    # Start to Detect
+    tolerance = 0.00001
+    result_open = []
+    for l_face in OPEN.face_list:
+        included = query_range(quad_tree_1, l_face.BoundBox)
+        for point in included:
+            # Already Checked
+            if point.check == True:
+                continue
+            # Area Check
+            if point.face.Area >= area_bound:
+                point.check = True
+                continue
+            # Inside Check
+            if not l_face.isInside(point.wire.CenterOfMass, 0.0, True):
+                continue
+
+            point.check = True
+            if len(point.wire.Edges) == 1:
+                vec = point.wire.Vertex1.Point- point.wire.CenterOfMass
+                r = sqrt(vec.dot(vec))
+                c = Part.makeCircle(r, point.wire.CenterOfMass)
+                c_wire = Part.Wire(c)
+                c_face = Part.Face(c_wire)
+                shade_area = formObject(c_face, point.label)
+            else:
+                shade_area = formObject(point.face, point.label)
+
+            # Distance Check For line_color only
+            if minDist(l_face, point.wire) < dr-tolerance:
+                shade_area.ViewObject.LineColor = error_line_color
+                shade_area.ViewObject.ShapeColor = error_shape_color
+            else:
+                shade_area.ViewObject.LineColor = (1.0, 1.0, 1.0)
+                #shade_area.ViewObject.ShapeColor = (1.0, 1.0, 1.0)
+
+            result_open.append(shade_area)
+
+    OPEN_component = App.ActiveDocument.addObject('App::DocumentObjectGroup', 'OPEN_component')
+    OPEN_component.Group = result_open
+    export_list.append(OPEN_component)
+
+    #===================================================
+    # Function 3: the dist. between board and board_pocket
+    #===================================================
+    d_board = float(pcaplib.get_pcap_d_board())
+    #board_pocket_color = board_pocket.getLayer().Group[0].ViewObject.LineColor
+
+    ## Add Document
+    #new_layer = App.ActiveDocument.addObject('App::DocumentObjectGroup', board_pocket.label+ '_exp')
+    #export_list.append(new_layer)
+    #new_layer.Label = board_pocket.label+ '_exp'
+
+    #new_layer_wire=[]
+    #for wire, label in zip(board_pocket.wire_list, board_pocket.label_list):
+    #    obj_wire=formObject(wire, label)
+    #    obj_wire.ViewObject.LineColor=board_pocket_color
+    #    new_layer_wire.append(obj_wire)
+
+    #new_layer.Group = new_layer_wire
+    export_list.append(board_pocket.getLayer())
+
+    pair_board_objs = []
+    board_color = (0.0, 0.0, 1.0)
+
+    fixture_board_too_close = []
+    # Create board_outline
+    for l_wire in board_pocket.wire_list:
+        # Create BoundBox
+        boundary = 10
+        vert1 = App.Vector(l_wire.CenterOfMass.x, l_wire.CenterOfMass.y, 0)- App.Vector(boundary/2, boundary/2, 0)
+        vert2 = App.Vector(l_wire.CenterOfMass.x, l_wire.CenterOfMass.y, 0)+ App.Vector(boundary/2, boundary/2, 0)
+        bbox = App.BoundBox(vert1, vert2)
+        # Query
+        included = query_range(quad_tree_1, bbox)
+        board = getBoard(included, area_bound)
+        if board:
+            show = formObject(board.wire, board.label)
+            show.ViewObject.LineColor = board_color
+            pair_board_objs.append((l_wire, show))
+            for edge in board.wire.Edges:
+                fixture_board_too_close.extend(gapCheck(l_wire, edge, d_board))
+
+    # Create layer_Board
+    Board = App.ActiveDocument.addObject('App::DocumentObjectGroup', 'board')
+    Board.Group = [board_obj for (l_wire, board_obj) in pair_board_objs]
+    export_list.append(Board)
+
+    # Change Color
+    for m in fixture_board_too_close:
+        m.ViewObject.LineColor = error_line_color
+
+    # Create layer_boardGapTooClose
+    layer_boardGapTooClose = App.ActiveDocument.addObject('App::DocumentObjectGroup', 'ERROR_Thru_thickness')
+    layer_boardGapTooClose.Group = fixture_board_too_close
+    layer_boardGapTooClose.Label = "[ERROR]Fixture Board Gap Less Than {}mm".format(d_board)
+    export_list.append(layer_boardGapTooClose)
+
+    del quad_tree_1
+    #===================================================
+    # Function 4 : Thru Thickness to thin
+    #===================================================
+    do = float(pcaplib.get_pcap_do())
+    slice_len = 2
+
+    # Create quad_tree_2
+    quad_tree_2 = QuadTree(botmask_bbox.XMin, botmask_bbox.YMin, botmask_bbox.XMax, botmask_bbox.YMax)
+
+    for i, layer in enumerate(layer_selected_list):
+        for j, wire in enumerate(layer.wire_list):
+            pts = wire.discretize(int(wire.Length/slice_len)+ 1)
+            # insert pts in QuadTree
+            for pt in pts[:-1]:
+                quad_tree_2.insert(Point2(pt, i, j))
+
+    # Start to Check for wire in OPEN
+    open_gap_too_close = []
+    for w in OPEN.wire_list:
+        check_bbox = App.BoundBox(w.BoundBox.XMin-do, w.BoundBox.YMin-do, 0, w.BoundBox.XMax+do, w.BoundBox.YMax+do, 0)
+        check = query_range(quad_tree_2, check_bbox)
+        # Obtain check_set
+        check_set = set()
+        for pt2 in check:
+            check_set.add((pt2.layer_idx, pt2.wire_idx))
+        # gap check
+        for (i, j) in check_set:
+            open_gap_too_close.extend(gapCheck(w, layer_selected_list[i].wire_list[j], do))
+
+    # Change Color
+    for m in open_gap_too_close:
+        m.ViewObject.LineColor = error_line_color
+
+    # Create layer_openGapTooClose
+    layer_openGapTooClose = App.ActiveDocument.addObject('App::DocumentObjectGroup', 'ERROR_Thru_thickness')
+    layer_openGapTooClose.Group = open_gap_too_close
+    layer_openGapTooClose.Label = "[ERROR]Thru Thickness Less Than {}mm".format(do)
+    export_list.append(layer_openGapTooClose)
+
+    #===================================================
+    # Function 5 : Check for Connect_Groove
+    #===================================================
+    dl = float(pcaplib.get_pcap_dl())
+    dw = float(pcaplib.get_pcap_dw())
+
+    tangents = [App.Vector(1,0,0), App.Vector(-1,0,0), App.Vector(0,1,0), App.Vector(0,-1,0)]
+
+    func5_result=[]
+    for l_wire, board_obj in pair_board_objs:
+        idxes, ccw = findGroove(l_wire, tangents)
+        L = len(l_wire.Edges)
+        edges = l_wire.Edges
+        for idx in idxes:
+            Vl1 = edges[idx].Vertex2.Point
+            Vl2 = edges[(idx+8)%L].Vertex1.Point
+            dl_check = Vl1.distanceToPoint(Vl2)
+            dw_check = board_obj.Shape.distToShape(edges[(idx+4)%L].Vertex1)[0]
+            if dl_check < dl:
+                func5_result.append(formObject(Part.makeLine(Vl1, Vl2)))
+            if dw_check < dw:
+                rot = App.Matrix(0,-1,0,0,1,0,0,0,0,0,1,0,0,0,0,1)
+                t = edges[(idx+4)%L].tangentAt(0)
+                t = rot.multVec(t)
+                Vwmid = (edges[(idx+4)%L].Vertex1.Point+ edges[(idx+4)%L].Vertex2.Point)/2
+                Vw2 = Vwmid+ ccw*dw_check*t
+                func5_result.append(formObject(Part.makeLine(Vwmid, Vw2)))
+
+    # Change Color
+    for m in func5_result:
+        m.ViewObject.LineColor = error_line_color
+
+    # Create layer_errorConnectGroove
+    layer_errorConnectGroove = App.ActiveDocument.addObject('App::DocumentObjectGroup', 'ERROR_ConnectGroove')
+    layer_errorConnectGroove.Group = func5_result
+    layer_errorConnectGroove.Label = "[ERROR]Connect Groove Dimension Violation"
+    export_list.append(layer_errorConnectGroove)
+
+    #===================================================
+    # Export DWG
+    #===================================================
+    import importDWG
+    importDWG.export(export_list,output_file_path)
+    # Reset the parameter PrefPCAPLayers
+    pcaplib.set_param("prefPCAPLayers", "")
+    end=time()
+
+    App.Console.PrintMessage("t = {}s\n".format(end- start))
+
+def run_press():
+    #===================================================
+    # Function 1
+    #===================================================
+    # Set distance and area_bound
+    start = time()
+
+    # Assuming filePath is defined earlier
+    # importDXF.open(filePath)
+
+    # Get values from pcaplib
+    dr = float(pcaplib.get_pcap_dr())
+
+    # Set default values
+    area_bound = float(pcaplib.get_pcap_area_bound())
+
+    # Determine the output folder
+    filePath = pcaplib.get_pcap_dxf_file_path()
+    output_folder = pcaplib.get_pcap_output_folder() or os.path.dirname(os.path.abspath(filePath))
+
+    # Construct the output file path using os.path.join
+    output_file_path = os.path.join(output_folder, "final_result.dwg")
+
+    # Initialize Custom Layer Object
+    if not pcaplib.get_pcap_dxf_layers():
+        App.Console.PrintWarning("Please select the layers and then press the \"Save Setting\" button!\n")
+        return -1
+    
+    if not pcaplib.get_pcap_layer_of_botsilk():
+        App.Console.PrintWarning("Cannot find Layer botsilk.\n")
+        return -1
+
+    if not pcaplib.get_pcap_layer_of_botpaste():
+        App.Console.PrintWarning("Cannot find Layer botpaste.\n")
+        return -1
+
+    if not pcaplib.get_pcap_layer_of_botmask():
+        App.Console.PrintWarning("Cannot find Layer botmask.\n")
+        return -1
+
+    if not pcaplib.get_pcap_layer_of_open():
+        App.Console.PrintWarning("Cannot find Layer OPEN.\n")
+        return -1
+        
+    if not pcaplib.get_pcap_layer_of_botmask():
+        App.Console.PrintWarning("Cannot find Layer board_pocket.\n")
+        return -1
+
+    layer_selected_list = []
+    for layer_label in pcaplib.get_pcap_dxf_layers().split(','):
+        #print(layer_label)
+        layer_selected_list.append(Layer(layer_label))
+
+    # Sorted in layer.depth
+    layer_selected_list.sort(key=lambda layer: layer.depth, reverse=True)
+
+    # Create an export_list
+    export_list = []
+
+    # Initialize layer botsilk, botmask, OPEN, PCB_2.5 and Check their Group() 
+    # Create botsilk Layer
+    botsilk = Layer(pcaplib.get_pcap_layer_of_botsilk())
+    botsilk.createFace(overlap_check=False)
+    if botsilk.getLayer().Group == []:
+        App.Console.PrintWarning("Layer botsilk is empty. Please check the DXF file.\n")
+        return -1
+
+    # Create botpaste Layer
+    botpaste = Layer(pcaplib.get_pcap_layer_of_botpaste())
+    botpaste.createFace(overlap_check=False)
+    if botpaste.getLayer().Group == []:
+        App.Console.PrintWarning("Layer botpaste is empty. Please check the DXF file.\n")
+        return -1
+
+    # Create botmask Layer
+    botmask = Layer(pcaplib.get_pcap_layer_of_botmask())
+    botmask.createFace(overlap_check=False)
+
+    if botmask.getLayer().Group == []:
+        App.Console.PrintWarning("Layer botmask is empty. Please check the DXF file.\n")
+        return -1
+
+    # Create OPEN Layer
+    OPEN = Layer(pcaplib.get_pcap_layer_of_open())
+    OPEN.createFace()
+    if (OPEN.getLayer().Group == []):
+        App.Console.PrintWarning("Layer Open is empty. Please reselect it and play again.\n")
+        return -1
+
+    # Create board_pocket Layer
+    board_pocket = Layer(pcaplib.get_pcap_layer_of_board_sink())
+    board_pocket.createFace(overlap_check=False)
+    if board_pocket.getLayer().Group == []:
+        App.Console.PrintWarning("Layer Board Sink is empty. Please reselect it and play again.\n")
+        return -1
+
+    ## Create layer_export
+    #for layer in layer_selected_list:
+    #    
+    #    #obtain layer property
+    #    #line_color
+    #    if (layer.getLayer().Group != []):
+    #        line_color = layer.getLayer().Group[0].ViewObject.LineColor
+
+    #    # Add Document
+    #    new_layer = App.ActiveDocument.addObject('App::DocumentObjectGroup', layer.label+ '_exp')
+    #    export_list.append(new_layer)
+    #    new_layer.Label = layer.label+ '_exp'
+    #    new_layer.Group = new_layer_wire
+
+    # Direct Output, since ezlib join directly
+    for layer in layer_selected_list:
+        export_list.append(layer.getLayer())
+
+    # Determine the Range and Create QuadTreeNode
+    botsilk_bbox = botsilk.getLayer().Shape.BoundBox
+    quad_tree = QuadTree(botsilk_bbox.XMin, botsilk_bbox.YMin, botsilk_bbox.XMax, botsilk_bbox.YMax)
+
+    # Insert Node in quad_tree (botsilk)
+    for wire, face, label in zip(botsilk.wire_list, botsilk.face_list, botsilk.label_list):
+        point = Point(wire, face, label)
+        # Set all circle check == True
+        if len(point.wire.Edges) == 1:
+                point.check = True
+        # Set all point's Area >= area_bound check == True
+        if point.face.Area >= area_bound:
+            point.check = True
+        quad_tree.insert(point)
+
+    # Insert Node in quad_tree (botpaste)
+    for wire, face, label in zip(botpaste.wire_list, botpaste.face_list, botpaste.label_list):
+        point = Point(wire, face, label)
+        # Set all circle check == True
+        if len(point.wire.Edges) == 1:
+                point.check = True
+        # Set all point's Area >= area_bound check == True
+        if point.face.Area >= area_bound:
+            point.check = True
+        quad_tree.insert(point)
+
+    # Start to detect
+    error_line_color = (1.0, 1.0, 0.0)
+    error_shape_color = (1.0, 0.0, 0.0)
+
+    point_list = checkForProblem(layer_selected_list, quad_tree, dr, area_bound)
+
+    problem_list = []
+    for point in point_list:
+        problem = formObject(point.face, point.label)
+        problem.ViewObject.LineColor = error_line_color
+        problem.ViewObject.ShapeColor = error_shape_color
+        problem_list.append(problem)
+
+    # Create layer_problem
+    layer_problem = App.ActiveDocument.addObject('App::DocumentObjectGroup', 'Problem')
+    layer_problem.Group = problem_list
+    layer_problem.Label = "[ERROR]Interference Within {}mm".format(dr)
+    export_list.append(layer_problem)
+
+    # New function: query for quad_tree to find point.check is False
+    not_check_list = query_not_checked(quad_tree)
+    problem_list = []
+    for point in not_check_list:
+        problem = formObject(point.face, point.label)
+        problem.ViewObject.LineColor = error_line_color
+        problem.ViewObject.ShapeColor = error_shape_color
+        problem_list.append(problem)
+
+    # Create layer_problem_interference
+    layer_problem_interference = App.ActiveDocument.addObject('App::DocumentObjectGroup', 'Problem_Interference')
+    layer_problem_interference.Group = problem_list
+    layer_problem_interference.Label = "[ERROR]Interference without Grooving".format(dr)
+    export_list.append(layer_problem_interference)
+
+    # del quad_tree
+    del quad_tree
+    #===================================================
+    # Function 2: Print All Component In Open And THRU
+    #===================================================
+    ## Get OPEN_color
+    #OPEN_color = OPEN.getLayer().Group[0].ViewObject.LineColor
+
+    ## Add Document
+    #new_layer = App.ActiveDocument.addObject('App::DocumentObjectGroup', OPEN.label+ '_exp')
+    #export_list.append(new_layer)
+    #new_layer.Label = OPEN.label+ '_exp'
+
+    #new_layer_wire=[]
+    #for wire, label in zip(OPEN.wire_list, OPEN.label_list):
+    #    obj_wire=formObject(wire, label)
+    #    obj_wire.ViewObject.LineColor=OPEN_color
+    #    new_layer_wire.append(obj_wire)
+
+    #new_layer.Group = new_layer_wire
+    #export_list.append(new_layer)
+
+    # Direct Output, since ezlib join directly
+    export_list.append(OPEN.getLayer())
+
+    # Determine the Range and Create QuadTreeNode
+    botmask_bbox = botmask.getLayer().Shape.BoundBox
+    quad_tree_1 = QuadTree(botmask_bbox.XMin, botmask_bbox.YMin, botmask_bbox.XMax, botmask_bbox.YMax)
+
+    # Insert Node in quad_tree (botmask)
+    for wire, face, label in zip(botmask.wire_list, botmask.face_list, botmask.label_list):
+        quad_tree_1.insert(Point(wire, face, label))
+
+    # Start to Detect
+    tolerance = 0.00001
+    result_open = []
+    for l_face in OPEN.face_list:
+        included = query_range(quad_tree_1, l_face.BoundBox)
+        for point in included:
+            # Already Checked
+            if point.check == True:
+                continue
+            # Area Check
+            if point.face.Area >= area_bound:
+                point.check = True
+                continue
+            # Inside Check
+            if not l_face.isInside(point.wire.CenterOfMass, 0.0, True):
+                continue
+
+            point.check = True
+            if len(point.wire.Edges) == 1:
+                vec = point.wire.Vertex1.Point- point.wire.CenterOfMass
+                r = sqrt(vec.dot(vec))
+                c = Part.makeCircle(r, point.wire.CenterOfMass)
+                c_wire = Part.Wire(c)
+                c_face = Part.Face(c_wire)
+                shade_area = formObject(c_face, point.label)
+            else:
+                shade_area = formObject(point.face, point.label)
+
+            # Distance Check For line_color only
+            if minDist(l_face, point.wire) < dr-tolerance:
+                shade_area.ViewObject.LineColor = error_line_color
+                shade_area.ViewObject.ShapeColor = error_shape_color
+            else:
+                shade_area.ViewObject.LineColor = (1.0, 1.0, 1.0)
+                #shade_area.ViewObject.ShapeColor = (1.0, 1.0, 1.0)
+
+            result_open.append(shade_area)
+
+    OPEN_component = App.ActiveDocument.addObject('App::DocumentObjectGroup', 'OPEN_component')
+    OPEN_component.Group = result_open
+    export_list.append(OPEN_component)
+
+    #===================================================
+    # Function 3: the dist. between board and board_pocket
+    #===================================================
+    d_board = float(pcaplib.get_pcap_d_board())
+    #board_pocket_color = board_pocket.getLayer().Group[0].ViewObject.LineColor
+
+    ## Add Document
+    #new_layer = App.ActiveDocument.addObject('App::DocumentObjectGroup', board_pocket.label+ '_exp')
+    #export_list.append(new_layer)
+    #new_layer.Label = board_pocket.label+ '_exp'
+
+    #new_layer_wire=[]
+    #for wire, label in zip(board_pocket.wire_list, board_pocket.label_list):
+    #    obj_wire=formObject(wire, label)
+    #    obj_wire.ViewObject.LineColor=board_pocket_color
+    #    new_layer_wire.append(obj_wire)
+
+    #new_layer.Group = new_layer_wire
+    export_list.append(board_pocket.getLayer())
+
+    pair_board_objs = []
+    board_color = (0.0, 0.0, 1.0)
+
+    fixture_board_too_close = []
+    # Create board_outline
+    for l_wire in board_pocket.wire_list:
+        # Create BoundBox
+        boundary = 10
+        vert1 = App.Vector(l_wire.CenterOfMass.x, l_wire.CenterOfMass.y, 0)- App.Vector(boundary/2, boundary/2, 0)
+        vert2 = App.Vector(l_wire.CenterOfMass.x, l_wire.CenterOfMass.y, 0)+ App.Vector(boundary/2, boundary/2, 0)
+        bbox = App.BoundBox(vert1, vert2)
+        # Query
+        included = query_range(quad_tree_1, bbox)
+        board = getBoard(included, area_bound)
+        if board:
+            show = formObject(board.wire, board.label)
+            show.ViewObject.LineColor = board_color
+            pair_board_objs.append((l_wire, show))
+            for edge in board.wire.Edges:
+                fixture_board_too_close.extend(gapCheck(l_wire, edge, d_board))
+
+    # Create layer_Board
+    Board = App.ActiveDocument.addObject('App::DocumentObjectGroup', 'board')
+    Board.Group = [board_obj for (l_wire, board_obj) in pair_board_objs]
+    export_list.append(Board)
+
+    # Change Color
+    for m in fixture_board_too_close:
+        m.ViewObject.LineColor = error_line_color
+
+    # Create layer_boardGapTooClose
+    layer_boardGapTooClose = App.ActiveDocument.addObject('App::DocumentObjectGroup', 'ERROR_Thru_thickness')
+    layer_boardGapTooClose.Group = fixture_board_too_close
+    layer_boardGapTooClose.Label = "[ERROR]Fixture Board Gap Less Than {}mm".format(d_board)
+    export_list.append(layer_boardGapTooClose)
+
+    del quad_tree_1
     #===================================================
     # Function 4 : Thru Thickness to thin
     #===================================================
@@ -740,4 +1947,3 @@ def findStopBlockWire(l_wires):
             max_wires.append(l_wires[idx])
 
     return max_wires
-
