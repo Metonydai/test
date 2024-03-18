@@ -349,8 +349,6 @@ class BVHAccel:
         return node
 
 
-def find
-
 def ezJoinPolys(entities): 
     bvh = BVHAccel(entities)
     sorted_polys = []
@@ -371,46 +369,20 @@ def ezJoinPolys(entities):
             else:
                 end = 0
 
-            if (len(polys) == 2):
+            if (len(polys) >= 2):
                 checkEntity = nextEntity
-                pl1 = polys[0] # reverse==False
-                pl2 = polys[1]
-                # Check if nextEntity is on the same side with pl1 and pl2
-                # find linear equation for pl2 : y = (y1 - y0) / (x1 - x0) * (x - x0) + y0
-                V1 = pl2.Vertexes[0] #Vec2
-                V2 = pl2.Vertexes[1] #Vec2
-                if V1.x == V2.x: # Vertical line, x = const 
-                    if (pl1.Vertexes[0].x - V1.x) * (checkEntity.Vertexes[end].x - V1.x) < 0: # pl1 start point is on the different side with checkEntity end point
-                        checkEntity.joined = True # Temporary!!
-                        nextEntity = bvh.findNextEntity(polys)
-                        if nextEntity and not nextEntity.joined: # Find newEntity
-                            checkEntity.joined = False # Return to False
-                        else:
-                            nextEntity = checkEntity # Did not find
-                else:
-                    m = (V2.y - V1.y) / (V2.x - V1.x)
-                    if (pl1.Vertexes[0].y - (m * (pl1.Vertexes[0].x- V1.x) + V1.y)) * (checkEntity.Vertexes[end].y - (m * (checkEntity.Vertexes[end].x- V1.x) + V1.y)) < 0:
-                        checkEntity.joined = True # Temporary!!
-                        nextEntity = bvh.findNextEntity(polys)
-                        if nextEntity and not nextEntity.joined: # Find newEntity
-                            checkEntity.joined = False # Return to False
-                        else:
-                            nextEntity = checkEntity # Did not find
-
-            elif (len(polys) == 3):
-                checkEntity = nextEntity
-                pl1 = polys[1] 
+                pl1 = polys[-2] 
                 if pl1.reverse:
                     pl1st = -1
                 else:
                     pl1st = 0
-                pl2 = polys[2]
+                pl2 = polys[-1]
                 # Check if nextEntity is on the same side with pl1 and pl2
                 # find linear equation for pl2 : y = (y1 - y0) / (x1 - x0) * (x - x0) + y0
                 V1 = pl2.Vertexes[0] #Vec2
                 V2 = pl2.Vertexes[1] #Vec2
                 if V1.x == V2.x: # Vertical line, x = const 
-                    if (pl1.Vertexes[pl1st].x- V1.x) * (checkEntity.Vertexes[end].x - V1.x) < 0: # pl1 start point is on the different side with checkEntity end point
+                    if (pl1.Vertexes[pl1st].x- V1.x) * (checkEntity.Vertexes[end].x - V1.x) <= 0: # pl1 start point is on the different side with checkEntity end point
                         checkEntity.joined = True # Temporary!!
                         nextEntity = bvh.findNextEntity(polys)
                         if nextEntity and not nextEntity.joined: # Find newEntity
@@ -424,7 +396,7 @@ def ezJoinPolys(entities):
                             nextEntity = checkEntity # Did not find
                 else:
                     m = (V2.y - V1.y) / (V2.x - V1.x)
-                    if (pl1.Vertexes[pl1st].y - (m * (pl1.Vertexes[pl1st].x- V1.x) + V1.y)) * (checkEntity.Vertexes[end].y - (m * (checkEntity.Vertexes[0].x- V1.x) + V1.y)) < 0:
+                    if (pl1.Vertexes[pl1st].y - (m * (pl1.Vertexes[pl1st].x- V1.x) + V1.y)) * (checkEntity.Vertexes[end].y - (m * (checkEntity.Vertexes[0].x- V1.x) + V1.y)) <= 0:
                         checkEntity.joined = True # Temporary!!
                         nextEntity = bvh.findNextEntity(polys)
                         if nextEntity and not nextEntity.joined: # Find newEntity
@@ -484,8 +456,8 @@ def maxExtent(bbox):
     else:
         return 1
 
-file_path = "C:\\Users\\Tony.dai\\Desktop\\fixture\\new_issue\\DDC需求資料\\HUIYU.dxf"
-#file_path = "C:\\Users\\KyoaniDai\\Desktop\\dxf\\Huiyu.dxf"
+#file_path = "C:\\Users\\Tony.dai\\Desktop\\fixture\\new_issue\\DDC需求資料\\HUIYU.dxf"
+file_path = "C:\\Users\\KyoaniDai\\Desktop\\dxf\\HUIYU0318.dxf"
 #file_path = "C:\\Users\\Tony.dai\\Desktop\\fixture\\new_issue\\DDC需求資料\\loveHuiyu.dxf"
 #file_path = "C:\\Users\\Tony.dai\\Desktop\\fixture\\new_issue\\DDC需求資料\\壓合\\台達電 DV-1000I 2976804200 壓合治具(驗證).dxf"
 #file_path = "C:\\Users\\Tony.dai\\Desktop\\fixture\\new_issue\\DDC需求資料\\slot_huiyu.dxf"
@@ -511,12 +483,6 @@ sel_layer = ['SST']
 ezjoin(doc, tmpdoc, sel_layer)
 
 
-#output_path = "C:\\Users\\KyoaniDai\\Desktop\\dxf\\LoveHuiyu.dxf"
-output_path = "C:\\Users\\Tony.dai\\Desktop\\fixture\\new_issue\\DDC需求資料\\loveHuiyu.dxf"
+output_path = "C:\\Users\\KyoaniDai\\Desktop\\dxf\\LoveHuiyu.dxf"
+#output_path = "C:\\Users\\Tony.dai\\Desktop\\fixture\\new_issue\\DDC需求資料\\loveHuiyu.dxf"
 tmpdoc.saveas(output_path)
-
-
-
-
-
-
