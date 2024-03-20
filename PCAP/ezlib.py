@@ -412,6 +412,20 @@ def ezprocessdxf(dxfdoc, sel_layer, mydoc=None):
                     entities.append(entity)
 
             elif e.dxftype() == 'INSERT':
+                if 'OBLONG' in e.dxf.name.upper():
+                    # Get C1, C2, R
+                    find_R = False
+                    for be in e1.virtual_entities():
+                        if not find_R and be.is_closed: # a circle in lwpolyline
+                            V1 = Vec2(be.get_points('xy')[0])
+                            V2 = Vec2(be.get_points('xy')[1])
+                            R = V1.distance(V2) # since polyline width is the same as diameter
+                            find_R = True
+                        else: # a line in lwpolyline 
+                            C1 = Vec2(be.get_points('xy')[0])
+                            C2 = Vec2(be.get_points('xy')[1])
+                    continue
+
                 # break the block to entities
                 for be in e.virtual_entities():
                     be.dxf.layer=l # set every be in layer l
@@ -436,6 +450,8 @@ def ezprocessdxf(dxfdoc, sel_layer, mydoc=None):
                         else:
                             entity = myEntity(be)
                             entities.append(entity)
+                    elif be.dxftype() == 'SOLID':
+                        tmpmsp.add_lwpolyline(be.vertices(), close=is_poly_closed)
             
             else:
                 pass
