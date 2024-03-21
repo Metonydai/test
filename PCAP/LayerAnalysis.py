@@ -105,7 +105,7 @@ class QuadTree:
 def initialize_tree(node):
     # Set all points' check to False
     if node is None:
-        pass
+        return
     for point in node.points:
         point.check = False
     for child in node.children:
@@ -286,7 +286,7 @@ def connectDots(nonclosed_shape):
         quad_tree.insert(start) # Insert sh's start point
         
     dot_list = quad_tree.get_all_points()
-    print("len(dot_list) : {} ".format(len(dot_list)))
+    #print("len(dot_list) : {} ".format(len(dot_list)))
     for dot in dot_list:
         if dot.connected:
             continue
@@ -310,7 +310,7 @@ def connectDots(nonclosed_shape):
             record_dots.append(next_dot)
             if next_dot.paired == record_dots[0]: # Form a Region
                 closed_wire.append(Part.Wire(polys)) 
-                Part.show(Part.Wire(polys))
+                #Part.show(Part.Wire(polys))
                 # Set all con_dot connected
                 for con_dot in record_dots:
                     con_dot.connected = True
@@ -1891,7 +1891,7 @@ def run_press():
     # Get wires_stopBlock
     wires_stopBlock = findStopBlockWire(stopBlock)
 
-    searchDist = 25
+    searchDist = blockKeepDist + 20.0
     do_not_keep_stopBlock = []
     tolerance = 0.00001
     # blockKeepDist
@@ -1902,7 +1902,7 @@ def run_press():
         included = query_range(quad_tree, search_bbox)
         for point in included:
             # Set all circle check == True, Hole or VIA Hole
-            if len(point.wire.Edges) == 1:
+            if len(point.wire.Edges) == 1 or len(point.wire.Edges) == 2:
                 continue
             # Area Check
             if point.face.Area >= area_bound:
@@ -1917,7 +1917,7 @@ def run_press():
     # Create layer_keep_dist_stopBlock
     layer_keep_dist_stopBlock = App.ActiveDocument.addObject('App::DocumentObjectGroup', 'Problem_keep_dist_stopBlock')
     layer_keep_dist_stopBlock.Group = do_not_keep_stopBlock
-    layer_keep_dist_stopBlock.Label = "[ERROR]Not keep enough dist {}mm with the stop block {}".format(blockKeepDist)
+    layer_keep_dist_stopBlock.Label = "[ERROR]Not keep enough dist {} mm with the stop_block".format(blockKeepDist)
     export_list.append(layer_keep_dist_stopBlock)
 
     #===================================================
@@ -1933,20 +1933,49 @@ def run_press():
     # Get max p_radius
     p_radius = -1
     for p in sp:
-        point_set.add((round(p.CenterOfMass.x, 5), round(p.CenterOfMess.y, 5))) # Add to point_set
+        point_set.add((round(p.CenterOfMass.x, 5), round(p.CenterOfMass.y, 5))) # Add to point_set
         if len(p.Edges) == 6:
             p_vert = p.Vertexes[0].Point
             R = (p_vert - p.CenterOfMass).Length
             if R >= p_radius:
                 p_radius = R
-        else:
-            R = p.Curve.Radius
+        elif hasattr(p.Edges[0], "Curve") and hasattr(p.Edges[0].Curve, "Radius"):
+            R = p.Edges[0].Curve.Radius
             if R >= p_radius:
                 p_radius = R
+    #print("R = ", R)
+    for p in fp:
+        point_set.add((round(p.CenterOfMass.x, 5), round(p.CenterOfMass.y, 5))) # Add to point_set
     
-    # Continue to add point to point_set
-     
+    print("len(point_set) : ", len(point_set))
+    do_not_keep_fixed_support = []
+    for p in point_set:
+        # Create a circle for every p in point_set
+        cen = App.Vector(p[0], p[1], 0)
+        circle = Part.Wire(Part.makeCircle(R, cen))
+        searchDist = distSupport + 20.0
+        search_bbox = App.BoundBox(circle.BoundBox.getPoint(0)- App.Vector(searchDist,searchDist,0), circle.BoundBox.getPoint(1)+ App.Vector(searchDist,searchDist,0))
+        included = query_range(quad_tree, search_bbox)
+        for point in included:
+            # Set all circle check == True, Hole or VIA Hole
+            if len(point.wire.Edges) == 1 or len(point.wire.Edges) == 2:
+                continue
+            # Area Check
+            if point.face.Area >= area_bound:
+                continue
+            # Distance Check
+            if minDist(circle, point.wire) < distSupport:
+                shade_area = formObject(point.face, point.label)
+                shade_area.ViewObject.LineColor = error_line_color
+                shade_area.ViewObject.ShapeColor = error_shape_color
+                do_not_keep_fixed_support.append(shade_area)
 
+    # Create layer_keep_dist_stopBlock
+    layer_keep_dist_fixed_support = App.ActiveDocument.addObject('App::DocumentObjectGroup', 'Problem_keep_dist_fixed_support')
+    layer_keep_dist_fixed_support.Group = do_not_keep_fixed_support
+    layer_keep_dist_fixed_support.Label = "[ERROR]Not keep enough dist {} mm with the Fixed_Pin and Support_Pin".format(distSupport)
+    export_list.append(layer_keep_dist_fixed_support)
+    
     #===================================================
     # Export DWG
     #===================================================
