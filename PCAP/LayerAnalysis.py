@@ -1831,9 +1831,6 @@ def run_press():
         # Set all points' Area >= area_bound check == True
         if point.face.Area >= area_bound:
             point.check = True
-        # Set all points' outside wire_supportBlock to True 
-        if not wire_supportBlock.BoundBox.isInside(App.Vector(point.x, point.y, 0)):
-            point.check = True
         quad_tree.insert(point)
 
     # Insert Node in quad_tree (botpaste)
@@ -1844,9 +1841,6 @@ def run_press():
                 point.check = True
         # Set all point's Area >= area_bound check == True
         if point.face.Area >= area_bound:
-            point.check = True
-        # Set all points' outside wire_supportBlock to True 
-        if not wire_supportBlock.BoundBox.isInside(App.Vector(point.x, point.y, 0)):
             point.check = True
         quad_tree.insert(point)
 
@@ -1869,8 +1863,12 @@ def run_press():
     layer_problem.Label = "[ERROR]Interference Within {}mm".format(dr)
     export_list.append(layer_problem)
 
-    # New function: query for quad_tree to find point.check is False
-    not_check_list = query_not_checked(quad_tree)
+    # Query for supportBlock BoundBox to find point.check is False
+    included_point = query_range(quad_tree, wire_supportBlock.BoundBox)
+    not_check_list = []
+    for pt in included_point:
+        if not pt.check:
+            not_check_list.append(pt)
     problem_list = []
     for point in not_check_list:
         problem = formObject(point.face, point.label)
@@ -1923,6 +1921,33 @@ def run_press():
     export_list.append(layer_keep_dist_stopBlock)
 
     #===================================================
+    # Function 3: Keep distance with the Fixed_Pin and Support_Pin
+    #===================================================
+    # Create a set for pin position
+    point_set = set()
+
+    # Obtain the radius of the pin for supportPin Layer
+    sp = supportPin.wire_list
+    fp = fixedPin.wire_list
+
+    # Get max p_radius
+    p_radius = -1
+    for p in sp:
+        point_set.add((round(p.CenterOfMass.x, 5), round(p.CenterOfMess.y, 5))) # Add to point_set
+        if len(p.Edges) == 6:
+            p_vert = p.Vertexes[0].Point
+            R = (p_vert - p.CenterOfMass).Length
+            if R >= p_radius:
+                p_radius = R
+        else:
+            R = p.Curve.Radius
+            if R >= p_radius:
+                p_radius = R
+    
+    # Continue to add point to point_set
+     
+
+    #===================================================
     # Export DWG
     #===================================================
     #import importDWG
@@ -1952,3 +1977,7 @@ def findStopBlockWire(layer_stopBlock):
             max_wires.append(l_wires[idx])
 
     return max_wires
+
+def listShow(shape_list):
+    for sh in shape_list:
+        Part.show(sh)
