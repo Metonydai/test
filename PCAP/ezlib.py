@@ -228,7 +228,9 @@ def ezJoinPolys(entities):
                 e0 = polys[0].m_entity
                 if e0.dxftype() in ['ARC', 'LWPOLYLINE']:
                     if e0.dxftype() == 'ARC':
-                        b0 = ezgetBulge(e0)
+                        z_orient = e0.dxf.extrusion.z
+                        z_orient /= abs(z_orient)
+                        b0 = z_orient * ezgetBulge(e0)
                     else:
                         b0 = e0.get_points()[-2][4]
 
@@ -415,8 +417,10 @@ def ezprocessdxf(dxfdoc, sel_layer, mydoc=None):
                 if 'OBLONG' in e.dxf.name.upper():
                     # Get C1, C2, R
                     find_R = False
-                    for be in e1.virtual_entities():
-                        if not find_R and be.is_closed: # a circle in lwpolyline
+                    for be in e.virtual_entities():
+                        if be.is_closed: # a circle in lwpolyline
+                            if find_R:
+                                continue
                             V1 = Vec2(be.get_points('xy')[0])
                             V2 = Vec2(be.get_points('xy')[1])
                             R = V1.distance(V2) # since polyline width is the same as diameter
@@ -424,6 +428,13 @@ def ezprocessdxf(dxfdoc, sel_layer, mydoc=None):
                         else: # a line in lwpolyline 
                             C1 = Vec2(be.get_points('xy')[0])
                             C2 = Vec2(be.get_points('xy')[1])
+                    CC = (C1 - C2).normalize()
+                    N = Vec2(-CC.y, CC.x)
+                    ob1 = C1 + R*N
+                    ob2 = C2 + R*N
+                    ob3 = C2 - R*N
+                    ob4 = C1 - R*N
+                    tmpmsp.add_lwpolyline([(ob1.x, ob1.y, 0), (ob2.x, ob2.y, 1), (ob3.x, ob3.y, 0), (ob4.x, ob4.y, 1)], format="xyb", close=True, dxfattribs={"layer": l})
                     continue
 
                 # break the block to entities
@@ -451,7 +462,7 @@ def ezprocessdxf(dxfdoc, sel_layer, mydoc=None):
                             entity = myEntity(be)
                             entities.append(entity)
                     elif be.dxftype() == 'SOLID':
-                        tmpmsp.add_lwpolyline(be.vertices(), close=is_poly_closed)
+                        tmpmsp.add_lwpolyline(be.vertices(), close=True, dxfattribs={"layer": l})
             
             else:
                 pass
@@ -466,8 +477,8 @@ def ezprocessdxf(dxfdoc, sel_layer, mydoc=None):
         for poly in sorted_entities:
             ezaddEntity(poly, tmpmsp, l)
 
-    output_path = "C:\\Users\\Tony.dai\\Desktop\\fixture\\new_issue\\DDC需求資料\\loveHuiyu.dxf"
-    tmpdoc.saveas(output_path)
+    #output_path = "C:\\Users\\Tony.dai\\Desktop\\fixture\\new_issue\\DDC需求資料\\loveHuiyu.dxf"
+    #tmpdoc.saveas(output_path)
 
     FreeCADGui.updateGui()
     # ======= Draw tmpdoc in FreeCAD =======
@@ -565,10 +576,12 @@ def ezaddEntity(ent_list, tmpmsp, l):
                 vertexes.append((myEnt.Vertexes[start].x, myEnt.Vertexes[start].y))
 
             elif e.dxftype() == 'ARC':
+                z_orient = e.dxf.extrusion.z
+                z_orient /= abs(z_orient)
                 if myEnt.reverse == False:
-                    vertexes.append((myEnt.Vertexes[start].x, myEnt.Vertexes[start].y,0,0,ezgetBulge(e)))
+                    vertexes.append((myEnt.Vertexes[start].x, myEnt.Vertexes[start].y,0,0, z_orient * ezgetBulge(e)))
                 else:
-                    vertexes.append((myEnt.Vertexes[start].x, myEnt.Vertexes[start].y,0,0,-ezgetBulge(e)))
+                    vertexes.append((myEnt.Vertexes[start].x, myEnt.Vertexes[start].y,0,0, -z_orient * ezgetBulge(e)))
 
             elif e.dxftype() == 'LWPOLYLINE':
                 if not set_width:
@@ -785,7 +798,8 @@ def ezdrawArc(arc):
     return None
 
 def ezdrawCircle(circle):
-    v = ezvec(circle.dxf.center)
+    ocs = circle.ocs()
+    v = ezvec(ocs.to_wcs(circle.dxf.center))
     curve = Part.Circle()
     curve.Radius = ezvec(circle.dxf.radius)
     curve.Center = v
@@ -793,7 +807,7 @@ def ezdrawCircle(circle):
         if (dxfCreateDraft or dxfCreateSketch):
             #pl = placementFromDXFOCS(circle)
             pl = FreeCAD.Placement()
-            return Draft.makeCircle(circle.radius, pl)
+            return Draft.makeCircle(curve.Radius, pl)
         else:
             return curve.toShape()
     except Part.OCCError:
