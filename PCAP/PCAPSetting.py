@@ -80,7 +80,7 @@ class Setting:
 
     @QtCore.Slot()
     def on_pushButtonChooseDir_clicked(self):
-        pcaplib.validate_token()
+        #pcaplib.validate_token()
         dir_choose = QtWidgets.QFileDialog.getExistingDirectory(None, "FileDialog", self.outputFolder)
         if dir_choose:
             self.set_dir_path(dir_choose)
@@ -101,6 +101,9 @@ class Setting:
             pcaplib.set_param("rtLayerOfRouterEdge", self.widget.rtLayerOfRouterEdge.currentText())
             delimiter = ','
             pcaplib.set_param("rtLayers", delimiter.join(self.get_item_text_from_selected_items(self.widget.rtListOfLayers)))
+            if self.widget.rtLayerOfBotsilk.currentText() and self.widget.rtLayerOfBotpaste.currentText() and self.widget.rtLayerOfRouterEdge.currentText() \
+            and self.widget.rtLayerOfBoardSink.currentText() and self.widget.rtLayerOfOpen.currentText() and self.get_item_text_from_selected_items(self.widget.rtListOfLayers):
+                self.widget.playButton.setDisabled(False)
         elif self.widget.tabWidget.currentIndex() == 1:
             pcaplib.set_param("prefPCAPDr", self.widget.ulDr.text())
             pcaplib.set_param("prefPCAPDboard", self.widget.ulDboard.text())
@@ -114,6 +117,10 @@ class Setting:
             pcaplib.set_param("prefPCAPLayerOfBoardSink", self.widget.ulLayerOfBoardSink.currentText())
             delimiter = ','
             pcaplib.set_param("ulLayers", delimiter.join(self.get_item_text_from_selected_items(self.widget.ulListOfLayers)))
+            # Enable play button not until click save button
+            if self.widget.ulLayerOfBotsilk.currentText() and self.widget.ulLayerOfBotpaste.currentText() and self.widget.ulLayerOfBotmask.currentText() \
+            and self.widget.ulLayerOfBoardSink.currentText() and self.get_item_text_from_selected_items(self.widget.ulListOfLayers):
+                self.widget.playButton.setDisabled(False)
         elif self.widget.tabWidget.currentIndex() == 2:
             pcaplib.set_param("prefPCAPDr", self.widget.prefPCAPDr.text())
             pcaplib.set_param("prefPCAPDboard", self.widget.prefPCAPDboard.text())
@@ -129,6 +136,9 @@ class Setting:
             pcaplib.set_param("prefPCAPLayerOfBoardSink", self.widget.prefPCAPLayerOfBoardSink.currentText())
             delimiter = ','
             pcaplib.set_param("prefPCAPLayers", delimiter.join(self.get_item_text_from_selected_items(self.widget.prefPCAPListOfLayers)))
+            if self.widget.prefPCAPLayerOfBotsilk.currentText() and self.widget.prefPCAPLayerOfBotpaste.currentText() and self.widget.prefPCAPLayerOfBotmask.currentText() \
+            and self.widget.prefPCAPLayerOfBoardSink.currentText() and self.widget.prefPCAPLayerOfOpen.currentText() and self.get_item_text_from_selected_items(self.widget.prefPCAPListOfLayers):
+                self.widget.playButton.setDisabled(False)
         elif self.widget.tabWidget.currentIndex() == 3:
             pcaplib.set_param("prefPCAPDr", self.widget.pressDr.text()) # Shared parameter
             pcaplib.set_param("pressBlockKeepDist", self.widget.pressBlockKeepDist.text())
@@ -145,10 +155,12 @@ class Setting:
             pcaplib.set_param("pressLayerOfPressfit", self.widget.pressLayerOfPressfit.currentText())
             delimiter = ','
             pcaplib.set_param("pressLayers", delimiter.join(self.get_item_text_from_selected_items(self.widget.pressListOfLayers)))
+            if self.widget.pressLayerOfBotsilk.currentText() and self.widget.pressLayerOfBotpaste.currentText() and self.widget.pressLayerOfFixedPin.currentText() \
+            and self.widget.pressLayerOfSupportPin.currentText() and self.get_item_text_from_selected_items(self.widget.pressListOfLayers) \
+            and self.widget.pressLayerOfSupportBlock.currentText() and self.widget.pressLayerOfStopBlock.currentText() and self.widget.pressLayerOfPressfit.currentText():
+                self.widget.playButton.setDisabled(False)
         
         pcaplib.set_param("prefPCAPOutputFolder", self.widget.prefPCAPOutputFolder.text())
-        # Enable play button not until click save button
-        self.widget.playButton.setDisabled(False)
 
     @QtCore.Slot()
     def on_playButton_clicked(self):
