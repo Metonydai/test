@@ -514,21 +514,27 @@ def findGroove(wire, tangents):
 
     return idxes, ccw
 
+def findStopBlockWire(layer_stopBlock):
+    l_wires = layer_stopBlock.wire_list
+    max_wires = []
+    enclosed_wires = [0] * len(l_wires)
+    for i, l_wire1 in enumerate(l_wires):
+        if enclosed_wires[i] == 1:
+            continue
+        for j, l_wire2 in enumerate(l_wires):
+            if i == j or enclosed_wires[j] == 1:
+                continue
+            if bboxCheck(l_wire1, l_wire2): # l_wire1 encloses l_wire2
+                enclosed_wires[j] = 1
+
+    for idx, value in enumerate(enclosed_wires):
+        if not value: # Means the wire is not enclosed by other wires
+            max_wires.append(l_wires[idx])
+
+    return max_wires
+
 def run_router():
-    #===================================================
-    # Function 1
-    #===================================================
-    # Set distance and area_bound
     start = time()
-
-    # Assuming filePath is defined earlier
-    # importDXF.open(filePath)
-
-    # Get values from pcaplib
-    dr = float(pcaplib.get_pcap_dr())
-
-    # Set default values
-    area_bound = float(pcaplib.get_pcap_area_bound())
 
     # Determine the output folder
     filePath = pcaplib.get_pcap_dxf_file_path()
@@ -537,100 +543,121 @@ def run_router():
     # Construct the output file path using os.path.join
     output_file_path = os.path.join(output_folder, "final_result.dwg")
 
+    # Get values from pcaplib
+    dr = float(pcaplib.get_pcap_dr())
+    area_bound = float(pcaplib.get_pcap_area_bound())
+    sbKeepDist = float(pcaplib.get_press_sb_keep_dist())
+    blockKeepDist = float(pcaplib.get_press_block_keep_dist())
+    distSupport = float(pcaplib.get_press_dist_support())
+
     # Initialize Custom Layer Object
-    if not pcaplib.get_pcap_dxf_layers():
+    if not pcaplib.get_press_layers():
         App.Console.PrintWarning("Please select the layers and then press the \"Save Setting\" button!\n")
         return -1
-    
     if not pcaplib.get_pcap_layer_of_botsilk():
-        App.Console.PrintWarning("Cannot find Layer botsilk.\n")
+        App.Console.PrintWarning("Cannot find Layer Botsilk.\n")
         return -1
-
     if not pcaplib.get_pcap_layer_of_botpaste():
-        App.Console.PrintWarning("Cannot find Layer botpaste.\n")
+        App.Console.PrintWarning("Cannot find Layer Botpaste.\n")
         return -1
-
-    if not pcaplib.get_pcap_layer_of_botmask():
-        App.Console.PrintWarning("Cannot find Layer botmask.\n")
+    #if not pcaplib.get_pcap_layer_of_botmask():
+    #    App.Console.PrintWarning("Cannot find Layer Botmask.\n")
+    #    return -1
+    if not pcaplib.get_press_layer_of_fixed_pin():
+        App.Console.PrintWarning("Cannot find Layer Fixed_Pin.\n")
         return -1
-
-    if not pcaplib.get_pcap_layer_of_open():
-        App.Console.PrintWarning("Cannot find Layer OPEN.\n")
+    if not pcaplib.get_press_layer_of_support_pin():
+        App.Console.PrintWarning("Cannot find Layer Supprot_Pin.\n")
         return -1
-        
-    if not pcaplib.get_pcap_layer_of_botmask():
-        App.Console.PrintWarning("Cannot find Layer board_pocket.\n")
+    if not pcaplib.get_press_layer_of_stop_block():
+        App.Console.PrintWarning("Cannot find Layer Stop_Block.\n")
+        return -1
+    if not pcaplib.get_press_layer_of_pressfit():
+        App.Console.PrintWarning("Cannot find Layer Pressfit.\n")
         return -1
 
     layer_selected_list = []
-    for layer_label in pcaplib.get_pcap_dxf_layers().split(','):
+    for layer_label in pcaplib.get_press_layers().split(','):
         #print(layer_label)
         layer_selected_list.append(Layer(layer_label))
 
     # Sorted in layer.depth
     layer_selected_list.sort(key=lambda layer: layer.depth, reverse=True)
 
-    # Create an export_list
-    export_list = []
-
-    # Initialize layer botsilk, botmask, OPEN, PCB_2.5 and Check their Group() 
+    # Initialize layer botsilk, botpaste, fixedPin, supportPin, supportBlock, stopBlock, pressfit and Check their Group() 
     # Create botsilk Layer
     botsilk = Layer(pcaplib.get_pcap_layer_of_botsilk(), is_layer_silk=True)
     botsilk.createFace(overlap_check=False)
     if botsilk.getLayer().Group == []:
-        App.Console.PrintWarning("Layer botsilk is empty. Please check the DXF file.\n")
+        App.Console.PrintWarning("Layer Botsilk is empty. Please check the DXF file.\n")
         return -1
 
     # Create botpaste Layer
     botpaste = Layer(pcaplib.get_pcap_layer_of_botpaste())
     botpaste.createFace(overlap_check=False)
     if botpaste.getLayer().Group == []:
-        App.Console.PrintWarning("Layer botpaste is empty. Please check the DXF file.\n")
+        App.Console.PrintWarning("Layer Botpaste is empty. Please check the DXF file.\n")
         return -1
 
-    # Create botmask Layer
-    botmask = Layer(pcaplib.get_pcap_layer_of_botmask())
-    botmask.createFace(overlap_check=False)
-
-    if botmask.getLayer().Group == []:
-        App.Console.PrintWarning("Layer botmask is empty. Please check the DXF file.\n")
+    # Create fixedPin Layer
+    fixedPin = Layer(pcaplib.get_press_layer_of_fixed_pin())
+    fixedPin.createFace(overlap_check=False)
+    if fixedPin.getLayer().Group == []:
+        App.Console.PrintWarning("Layer Fixed_Pin is empty. Please check the DXF file.\n")
         return -1
 
-    # Create OPEN Layer
-    OPEN = Layer(pcaplib.get_pcap_layer_of_open())
-    OPEN.createFace()
-    if (OPEN.getLayer().Group == []):
-        App.Console.PrintWarning("Layer Open is empty. Please reselect it and play again.\n")
+    # Create supportPin Layer
+    supportPin = Layer(pcaplib.get_press_layer_of_support_pin())
+    supportPin.createFace(overlap_check=False)
+    if supportPin.getLayer().Group == []:
+        App.Console.PrintWarning("Layer Support_Pin is empty. Please check the DXF file.\n")
+        return -1
+    
+    # Create supportBlock Layer
+    supportBlock = Layer(pcaplib.get_press_layer_of_support_block())
+    supportBlock.createFace(overlap_check=False)
+    if supportBlock.getLayer().Group == []:
+        App.Console.PrintWarning("Layer Support_Block is empty. Please check the DXF file.\n")
+        return -1
+    
+    # Create stopBlock Layer
+    stopBlock = Layer(pcaplib.get_press_layer_of_stop_block())
+    stopBlock.createFace(overlap_check=False)
+    if stopBlock.getLayer().Group == []:
+        App.Console.PrintWarning("Layer Stop_Block is empty. Please check the DXF file.\n")
         return -1
 
-    # Create board_pocket Layer
-    board_pocket = Layer(pcaplib.get_pcap_layer_of_board_sink())
-    board_pocket.createFace(overlap_check=False)
-    if board_pocket.getLayer().Group == []:
-        App.Console.PrintWarning("Layer Board Sink is empty. Please reselect it and play again.\n")
+    # Create pressfit Layer
+    pressfit = Layer(pcaplib.get_press_layer_of_pressfit())
+    pressfit.createFace(overlap_check=False)
+    if pressfit.getLayer().Group == []:
+        App.Console.PrintWarning("Layer Pressfit is empty. Please check the DXF file.\n")
         return -1
-
-    ## Create layer_export
-    #for layer in layer_selected_list:
-    #    
-    #    #obtain layer property
-    #    #line_color
-    #    if (layer.getLayer().Group != []):
-    #        line_color = layer.getLayer().Group[0].ViewObject.LineColor
-
-    #    # Add Document
-    #    new_layer = App.ActiveDocument.addObject('App::DocumentObjectGroup', layer.label+ '_exp')
-    #    export_list.append(new_layer)
-    #    new_layer.Label = layer.label+ '_exp'
-    #    new_layer.Group = new_layer_wire
+    #===================================================
+    # Function 1 : Interference check (Grooving)
+    #===================================================
+    # Create an export_list
+    export_list = []
 
     # Direct Output, since ezlib join directly
     for layer in layer_selected_list:
         export_list.append(layer.getLayer())
 
+    # Add botsilk, botpaste, fixedPin, supportPin, supportBlock, stopBlock, pressfit 
+    export_list.append(botsilk.getLayer())
+    export_list.append(botpaste.getLayer())
+    export_list.append(fixedPin.getLayer())
+    export_list.append(supportPin.getLayer())
+    export_list.append(supportBlock.getLayer())
+    export_list.append(stopBlock.getLayer())
+    export_list.append(pressfit.getLayer())
+
     # Determine the Range and Create QuadTreeNode
     botsilk_bbox = botsilk.getLayer().Shape.BoundBox
     quad_tree = QuadTree(botsilk_bbox.XMin, botsilk_bbox.YMin, botsilk_bbox.XMax, botsilk_bbox.YMax)
+
+    # wire supportBlock
+    wire_supportBlock = supportBlock.wire_list[0]
 
     # Insert Node in quad_tree (botsilk)
     for wire, face, label in zip(botsilk.wire_list, botsilk.face_list, botsilk.label_list):
@@ -638,7 +665,7 @@ def run_router():
         # Set all circle check == True
         if len(point.wire.Edges) == 1:
                 point.check = True
-        # Set all point's Area >= area_bound check == True
+        # Set all points' Area >= area_bound check == True
         if point.face.Area >= area_bound:
             point.check = True
         quad_tree.insert(point)
@@ -673,8 +700,12 @@ def run_router():
     layer_problem.Label = "[ERROR]Interference Within {}mm".format(dr)
     export_list.append(layer_problem)
 
-    # New function: query for quad_tree to find point.check is False
-    not_check_list = query_not_checked(quad_tree)
+    # Query for supportBlock BoundBox to find point.check is False
+    included_point = query_range(quad_tree, wire_supportBlock.BoundBox)
+    not_check_list = []
+    for pt in included_point:
+        if not pt.check:
+            not_check_list.append(pt)
     problem_list = []
     for point in not_check_list:
         problem = formObject(point.face, point.label)
@@ -685,225 +716,167 @@ def run_router():
     # Create layer_problem_interference
     layer_problem_interference = App.ActiveDocument.addObject('App::DocumentObjectGroup', 'Problem_Interference')
     layer_problem_interference.Group = problem_list
-    layer_problem_interference.Label = "[ERROR]Interference without Grooving".format(dr)
+    layer_problem_interference.Label = "[ERROR]Interference without Grooving"
     export_list.append(layer_problem_interference)
 
-    # del quad_tree
-    del quad_tree
     #===================================================
-    # Function 2: Print All Component In Open And THRU
+    # Function 2: Keep distance with the Stop_Block
     #===================================================
-    ## Get OPEN_color
-    #OPEN_color = OPEN.getLayer().Group[0].ViewObject.LineColor
+    # Set all points in quad_tree False in order to analyze
+    initialize_tree(quad_tree)
 
-    ## Add Document
-    #new_layer = App.ActiveDocument.addObject('App::DocumentObjectGroup', OPEN.label+ '_exp')
-    #export_list.append(new_layer)
-    #new_layer.Label = OPEN.label+ '_exp'
+    # Get wires_stopBlock
+    wires_stopBlock = findStopBlockWire(stopBlock)
 
-    #new_layer_wire=[]
-    #for wire, label in zip(OPEN.wire_list, OPEN.label_list):
-    #    obj_wire=formObject(wire, label)
-    #    obj_wire.ViewObject.LineColor=OPEN_color
-    #    new_layer_wire.append(obj_wire)
-
-    #new_layer.Group = new_layer_wire
-    #export_list.append(new_layer)
-
-    # Direct Output, since ezlib join directly
-    export_list.append(OPEN.getLayer())
-
-    # Determine the Range and Create QuadTreeNode
-    botmask_bbox = botmask.getLayer().Shape.BoundBox
-    quad_tree_1 = QuadTree(botmask_bbox.XMin, botmask_bbox.YMin, botmask_bbox.XMax, botmask_bbox.YMax)
-
-    # Insert Node in quad_tree (botmask)
-    for wire, face, label in zip(botmask.wire_list, botmask.face_list, botmask.label_list):
-        quad_tree_1.insert(Point(wire, face, label))
-
-    # Start to Detect
-    tolerance = 0.00001
-    result_open = []
-    for l_face in OPEN.face_list:
-        included = query_range(quad_tree_1, l_face.BoundBox)
+    searchDist = blockKeepDist + 20.0
+    do_not_keep_stopBlock = []
+    # blockKeepDist
+    for stopB in wires_stopBlock:
+        stopB_face = Part.Face(stopB)
+        stopB_bbox = stopB.BoundBox
+        search_bbox = App.BoundBox(stopB_bbox.getPoint(0)-App.Vector(searchDist,searchDist,0), stopB_bbox.getPoint(1)+ App.Vector(searchDist,searchDist,0))
+        included = query_range(quad_tree, search_bbox)
         for point in included:
-            # Already Checked
-            if point.check == True:
+            # Set all circle check == True, Hole or VIA Hole
+            if len(point.wire.Edges) == 1 or len(point.wire.Edges) == 2:
                 continue
             # Area Check
             if point.face.Area >= area_bound:
-                point.check = True
                 continue
-            # Inside Check
-            if not l_face.isInside(point.wire.CenterOfMass, 0.0, True):
-                continue
-
-            point.check = True
-            if len(point.wire.Edges) == 1:
-                vec = point.wire.Vertex1.Point- point.wire.CenterOfMass
-                r = sqrt(vec.dot(vec))
-                c = Part.makeCircle(r, point.wire.CenterOfMass)
-                c_wire = Part.Wire(c)
-                c_face = Part.Face(c_wire)
-                shade_area = formObject(c_face, point.label)
-            else:
+            # Distance Check
+            if minDist(stopB_face, point.wire) < blockKeepDist:
                 shade_area = formObject(point.face, point.label)
-
-            # Distance Check For line_color only
-            if minDist(l_face, point.wire) < dr-tolerance:
                 shade_area.ViewObject.LineColor = error_line_color
                 shade_area.ViewObject.ShapeColor = error_shape_color
-            else:
-                shade_area.ViewObject.LineColor = (1.0, 1.0, 1.0)
-                #shade_area.ViewObject.ShapeColor = (1.0, 1.0, 1.0)
-
-            result_open.append(shade_area)
-
-    OPEN_component = App.ActiveDocument.addObject('App::DocumentObjectGroup', 'OPEN_component')
-    OPEN_component.Group = result_open
-    export_list.append(OPEN_component)
+                do_not_keep_stopBlock.append(shade_area)
+   
+    # Create layer_keep_dist_stopBlock
+    layer_keep_dist_stopBlock = App.ActiveDocument.addObject('App::DocumentObjectGroup', 'Problem_keep_dist_stopBlock')
+    layer_keep_dist_stopBlock.Group = do_not_keep_stopBlock
+    layer_keep_dist_stopBlock.Label = "[ERROR]Not keep enough dist {} mm with the stop_block".format(blockKeepDist)
+    export_list.append(layer_keep_dist_stopBlock)
 
     #===================================================
-    # Function 3: the dist. between board and board_pocket
+    # Function 3: Keep distance with the Fixed_Pin and Support_Pin
     #===================================================
-    d_board = float(pcaplib.get_pcap_d_board())
-    #board_pocket_color = board_pocket.getLayer().Group[0].ViewObject.LineColor
+    # Create a set for pin position
+    point_set = set()
 
-    ## Add Document
-    #new_layer = App.ActiveDocument.addObject('App::DocumentObjectGroup', board_pocket.label+ '_exp')
-    #export_list.append(new_layer)
-    #new_layer.Label = board_pocket.label+ '_exp'
+    # Obtain the radius of the pin for supportPin Layer
+    sp = supportPin.wire_list
+    fp = fixedPin.wire_list
 
-    #new_layer_wire=[]
-    #for wire, label in zip(board_pocket.wire_list, board_pocket.label_list):
-    #    obj_wire=formObject(wire, label)
-    #    obj_wire.ViewObject.LineColor=board_pocket_color
-    #    new_layer_wire.append(obj_wire)
+    # Get max p_radius
+    p_radius = -1
+    for p in sp:
+        point_set.add((round(p.CenterOfMass.x, 5), round(p.CenterOfMass.y, 5))) # Add to point_set
+        if len(p.Edges) == 6:
+            p_vert = p.Vertexes[0].Point
+            R = (p_vert - p.CenterOfMass).Length
+            if R >= p_radius:
+                p_radius = R
+        elif hasattr(p.Edges[0], "Curve") and hasattr(p.Edges[0].Curve, "Radius"):
+            R = p.Edges[0].Curve.Radius
+            if R >= p_radius:
+                p_radius = R
+    #print("R = ", R)
+    for p in fp:
+        point_set.add((round(p.CenterOfMass.x, 5), round(p.CenterOfMass.y, 5))) # Add to point_set
+    
+    #print("len(point_set) : ", len(point_set))
+    do_not_keep_fixed_support = []
+    for p in point_set:
+        # Create a circle for every p in point_set
+        cen = App.Vector(p[0], p[1], 0)
+        circle = Part.Wire(Part.makeCircle(R, cen))
+        searchDist = distSupport + 20.0
+        search_bbox = App.BoundBox(circle.BoundBox.getPoint(0)- App.Vector(searchDist,searchDist,0), circle.BoundBox.getPoint(1)+ App.Vector(searchDist,searchDist,0))
+        included = query_range(quad_tree, search_bbox)
+        for point in included:
+            # Set all circle check == True, Hole or VIA Hole
+            if len(point.wire.Edges) == 1 or len(point.wire.Edges) == 2:
+                continue
+            # Area Check
+            if point.face.Area >= area_bound:
+                continue
+            # Distance Check
+            if minDist(circle, point.wire) < distSupport:
+                shade_area = formObject(point.face, point.label)
+                shade_area.ViewObject.LineColor = error_line_color
+                shade_area.ViewObject.ShapeColor = error_shape_color
+                do_not_keep_fixed_support.append(shade_area)
 
-    #new_layer.Group = new_layer_wire
-    export_list.append(board_pocket.getLayer())
-
-    pair_board_objs = []
-    board_color = (0.0, 0.0, 1.0)
-
-    fixture_board_too_close = []
-    # Create board_outline
-    for l_wire in board_pocket.wire_list:
-        # Create BoundBox
-        boundary = 10
-        vert1 = App.Vector(l_wire.CenterOfMass.x, l_wire.CenterOfMass.y, 0)- App.Vector(boundary/2, boundary/2, 0)
-        vert2 = App.Vector(l_wire.CenterOfMass.x, l_wire.CenterOfMass.y, 0)+ App.Vector(boundary/2, boundary/2, 0)
-        bbox = App.BoundBox(vert1, vert2)
-        # Query
-        included = query_range(quad_tree_1, bbox)
-        board = getBoard(included, area_bound)
-        if board:
-            show = formObject(board.wire, board.label)
-            show.ViewObject.LineColor = board_color
-            pair_board_objs.append((l_wire, show))
-            for edge in board.wire.Edges:
-                fixture_board_too_close.extend(gapCheck(l_wire, edge, d_board))
-
-    # Create layer_Board
-    Board = App.ActiveDocument.addObject('App::DocumentObjectGroup', 'board')
-    Board.Group = [board_obj for (l_wire, board_obj) in pair_board_objs]
-    export_list.append(Board)
-
-    # Change Color
-    for m in fixture_board_too_close:
-        m.ViewObject.LineColor = error_line_color
-
-    # Create layer_boardGapTooClose
-    layer_boardGapTooClose = App.ActiveDocument.addObject('App::DocumentObjectGroup', 'ERROR_Thru_thickness')
-    layer_boardGapTooClose.Group = fixture_board_too_close
-    layer_boardGapTooClose.Label = "[ERROR]Fixture Board Gap Less Than {}mm".format(d_board)
-    export_list.append(layer_boardGapTooClose)
-
-    del quad_tree_1
+    # Create layer_keep_dist_stopBlock
+    layer_keep_dist_fixed_support = App.ActiveDocument.addObject('App::DocumentObjectGroup', 'Problem_keep_dist_fixed_support')
+    layer_keep_dist_fixed_support.Group = do_not_keep_fixed_support
+    layer_keep_dist_fixed_support.Label = "[ERROR]Not keep enough dist {} mm with the Fixed_Pin and Support_Pin".format(distSupport)
+    export_list.append(layer_keep_dist_fixed_support)
+    # del quad_tree
+    del quad_tree
     #===================================================
-    # Function 4 : Thru Thickness to thin
+    # Function 4: Promise that all pins in Pressfit has grooving and Function 5: Keep Dist. with SupportBlock
     #===================================================
-    do = float(pcaplib.get_pcap_do())
-    slice_len = 2
+    # Create quad_tree_pressfit
+    bbox_pressfit = findBoundBox(pressfit.wire_list)
+    quad_tree_pressfit = QuadTree(bbox_pressfit.XMin, bbox_pressfit.YMin, bbox_pressfit.XMax, bbox_pressfit.YMax)
+    
+    # supportBlock
+    bbox_supportBlock = supportBlock.wire_list[0].BoundBox
 
-    # Create quad_tree_2
-    quad_tree_2 = QuadTree(botmask_bbox.XMin, botmask_bbox.YMin, botmask_bbox.XMax, botmask_bbox.YMax)
+    # Insert Node in quad_tree (pressfit)
+    for wire, face, label in zip(pressfit.wire_list, pressfit.face_list, pressfit.label_list):
+        point = Point(wire, face, label)
+        if point.face.Area >= area_bound:
+            continue
+        # Focus only on point on the supportBlock
+        if not bbox_supportBlock.isInside(point.wire.CenterOfMass):
+            continue
+        quad_tree_pressfit.insert(point)
+    
+    for layer in layer_selected_list:
+        layer.createFace(overlap_check=False)
+        for l_face in layer.face_list:
+            included = query_range(quad_tree_pressfit, l_face.BoundBox)
+            for point in included:
+                if l_face.isInside(point.wire.CenterOfMass, 0.0, True):
+                    point.check = True
+    
+    # Query for not checked
+    not_checked_pressfitPin = query_not_checked(quad_tree_pressfit)
+    problem_list = []
+    for point in not_checked_pressfitPin:
+        problem = formObject(point.face, point.label)
+        problem.ViewObject.LineColor = error_line_color
+        problem.ViewObject.ShapeColor = error_shape_color
+        problem_list.append(problem)
 
-    for i, layer in enumerate(layer_selected_list):
-        for j, wire in enumerate(layer.wire_list):
-            pts = wire.discretize(int(wire.Length/slice_len)+ 1)
-            # insert pts in QuadTree
-            for pt in pts[:-1]:
-                quad_tree_2.insert(Point2(pt, i, j))
+    # Create layer_pressfit_interference
+    layer_pressfit_interference = App.ActiveDocument.addObject('App::DocumentObjectGroup', 'PressfitPin_Interference')
+    layer_pressfit_interference.Group = problem_list
+    layer_pressfit_interference.Label = "[ERROR]Pressfit Interference without Grooving"
+    export_list.append(layer_pressfit_interference)
+    
+    # Function 5: Promise all pressfit Pins stay on the supportBlock and keep some dist.
+    #point_list = checkForProblem(supportBlock, quad_tree_pressfit, sbKeepDist, area_bound)
+    point_list = checkForProblem([supportBlock], quad_tree_pressfit, 5, area_bound)
 
-    # Start to Check for wire in OPEN
-    open_gap_too_close = []
-    for w in OPEN.wire_list:
-        check_bbox = App.BoundBox(w.BoundBox.XMin-do, w.BoundBox.YMin-do, 0, w.BoundBox.XMax+do, w.BoundBox.YMax+do, 0)
-        check = query_range(quad_tree_2, check_bbox)
-        # Obtain check_set
-        check_set = set()
-        for pt2 in check:
-            check_set.add((pt2.layer_idx, pt2.wire_idx))
-        # gap check
-        for (i, j) in check_set:
-            open_gap_too_close.extend(gapCheck(w, layer_selected_list[i].wire_list[j], do))
+    problem_list = []
+    for point in point_list:
+        problem = formObject(point.face, point.label)
+        problem.ViewObject.LineColor = error_line_color
+        problem.ViewObject.ShapeColor = error_shape_color
+        problem_list.append(problem)
 
-    # Change Color
-    for m in open_gap_too_close:
-        m.ViewObject.LineColor = error_line_color
-
-    # Create layer_openGapTooClose
-    layer_openGapTooClose = App.ActiveDocument.addObject('App::DocumentObjectGroup', 'ERROR_Thru_thickness')
-    layer_openGapTooClose.Group = open_gap_too_close
-    layer_openGapTooClose.Label = "[ERROR]Thru Thickness Less Than {}mm".format(do)
-    export_list.append(layer_openGapTooClose)
-
-    #===================================================
-    # Function 5 : Check for Connect_Groove
-    #===================================================
-    dl = float(pcaplib.get_pcap_dl())
-    dw = float(pcaplib.get_pcap_dw())
-
-    tangents = [App.Vector(1,0,0), App.Vector(-1,0,0), App.Vector(0,1,0), App.Vector(0,-1,0)]
-
-    func5_result=[]
-    for l_wire, board_obj in pair_board_objs:
-        idxes, ccw = findGroove(l_wire, tangents)
-        L = len(l_wire.Edges)
-        edges = l_wire.Edges
-        for idx in idxes:
-            Vl1 = edges[idx].Vertex2.Point
-            Vl2 = edges[(idx+8)%L].Vertex1.Point
-            dl_check = Vl1.distanceToPoint(Vl2)
-            dw_check = board_obj.Shape.distToShape(edges[(idx+4)%L].Vertex1)[0]
-            if dl_check < dl:
-                func5_result.append(formObject(Part.makeLine(Vl1, Vl2)))
-            if dw_check < dw:
-                rot = App.Matrix(0,-1,0,0,1,0,0,0,0,0,1,0,0,0,0,1)
-                t = edges[(idx+4)%L].tangentAt(0)
-                t = rot.multVec(t)
-                Vwmid = (edges[(idx+4)%L].Vertex1.Point+ edges[(idx+4)%L].Vertex2.Point)/2
-                Vw2 = Vwmid+ ccw*dw_check*t
-                func5_result.append(formObject(Part.makeLine(Vwmid, Vw2)))
-
-    # Change Color
-    for m in func5_result:
-        m.ViewObject.LineColor = error_line_color
-
-    # Create layer_errorConnectGroove
-    layer_errorConnectGroove = App.ActiveDocument.addObject('App::DocumentObjectGroup', 'ERROR_ConnectGroove')
-    layer_errorConnectGroove.Group = func5_result
-    layer_errorConnectGroove.Label = "[ERROR]Connect Groove Dimension Violation"
-    export_list.append(layer_errorConnectGroove)
-
+    # Create layer_problem
+    layer_pressfit_pins_support = App.ActiveDocument.addObject('App::DocumentObjectGroup', 'press_pins_support')
+    layer_pressfit_pins_support.Group = problem_list
+    layer_pressfit_pins_support.Label = "[ERROR]Pressfit Pins do not keep safe Distance with Support_Block in {}mm".format(sbKeepDist)
+    export_list.append(layer_pressfit_pins_support)
     #===================================================
     # Export DWG
     #===================================================
     import importDWG
     importDWG.export(export_list,output_file_path)
-    # Reset the parameter PrefPCAPLayers
-    pcaplib.set_param("prefPCAPLayers", "")
     end=time()
 
     App.Console.PrintMessage("t = {}s\n".format(end- start))
@@ -1691,7 +1664,7 @@ def run_wave():
     import importDWG
     importDWG.export(export_list,output_file_path)
     # Reset the parameter PrefPCAPLayers
-    pcaplib.set_param("prefPCAPLayers", "")
+    #pcaplib.set_param("prefPCAPLayers", "")
     end=time()
 
     App.Console.PrintMessage("t = {}s\n".format(end- start))
@@ -1819,7 +1792,7 @@ def run_press():
     botsilk_bbox = botsilk.getLayer().Shape.BoundBox
     quad_tree = QuadTree(botsilk_bbox.XMin, botsilk_bbox.YMin, botsilk_bbox.XMax, botsilk_bbox.YMax)
 
-    # fLayer supportBlock bbox
+    # wire supportBlock
     wire_supportBlock = supportBlock.wire_list[0]
 
     # Insert Node in quad_tree (botsilk)
@@ -1879,7 +1852,7 @@ def run_press():
     # Create layer_problem_interference
     layer_problem_interference = App.ActiveDocument.addObject('App::DocumentObjectGroup', 'Problem_Interference')
     layer_problem_interference.Group = problem_list
-    layer_problem_interference.Label = "[ERROR]Interference without Grooving".format(dr)
+    layer_problem_interference.Label = "[ERROR]Interference without Grooving"
     export_list.append(layer_problem_interference)
 
     #===================================================
@@ -1893,7 +1866,6 @@ def run_press():
 
     searchDist = blockKeepDist + 20.0
     do_not_keep_stopBlock = []
-    tolerance = 0.00001
     # blockKeepDist
     for stopB in wires_stopBlock:
         stopB_face = Part.Face(stopB)
@@ -1947,7 +1919,7 @@ def run_press():
     for p in fp:
         point_set.add((round(p.CenterOfMass.x, 5), round(p.CenterOfMass.y, 5))) # Add to point_set
     
-    print("len(point_set) : ", len(point_set))
+    #print("len(point_set) : ", len(point_set))
     do_not_keep_fixed_support = []
     for p in point_set:
         # Create a circle for every p in point_set
@@ -1975,37 +1947,76 @@ def run_press():
     layer_keep_dist_fixed_support.Group = do_not_keep_fixed_support
     layer_keep_dist_fixed_support.Label = "[ERROR]Not keep enough dist {} mm with the Fixed_Pin and Support_Pin".format(distSupport)
     export_list.append(layer_keep_dist_fixed_support)
+    # del quad_tree
+    del quad_tree
+    #===================================================
+    # Function 4: Promise that all pins in Pressfit has grooving and Function 5: Keep Dist. with SupportBlock
+    #===================================================
+    # Create quad_tree_pressfit
+    bbox_pressfit = findBoundBox(pressfit.wire_list)
+    quad_tree_pressfit = QuadTree(bbox_pressfit.XMin, bbox_pressfit.YMin, bbox_pressfit.XMax, bbox_pressfit.YMax)
     
+    # supportBlock
+    bbox_supportBlock = supportBlock.wire_list[0].BoundBox
+
+    # Insert Node in quad_tree (pressfit)
+    for wire, face, label in zip(pressfit.wire_list, pressfit.face_list, pressfit.label_list):
+        point = Point(wire, face, label)
+        if point.face.Area >= area_bound:
+            continue
+        # Focus only on point on the supportBlock
+        if not bbox_supportBlock.isInside(point.wire.CenterOfMass):
+            continue
+        quad_tree_pressfit.insert(point)
+    
+    for layer in layer_selected_list:
+        layer.createFace(overlap_check=False)
+        for l_face in layer.face_list:
+            included = query_range(quad_tree_pressfit, l_face.BoundBox)
+            for point in included:
+                if l_face.isInside(point.wire.CenterOfMass, 0.0, True):
+                    point.check = True
+    
+    # Query for not checked
+    not_checked_pressfitPin = query_not_checked(quad_tree_pressfit)
+    problem_list = []
+    for point in not_checked_pressfitPin:
+        problem = formObject(point.face, point.label)
+        problem.ViewObject.LineColor = error_line_color
+        problem.ViewObject.ShapeColor = error_shape_color
+        problem_list.append(problem)
+
+    # Create layer_pressfit_interference
+    layer_pressfit_interference = App.ActiveDocument.addObject('App::DocumentObjectGroup', 'PressfitPin_Interference')
+    layer_pressfit_interference.Group = problem_list
+    layer_pressfit_interference.Label = "[ERROR]Pressfit Interference without Grooving"
+    export_list.append(layer_pressfit_interference)
+    
+    # Function 5: Promise all pressfit Pins stay on the supportBlock and keep some dist.
+    point_list = checkForProblem([supportBlock], quad_tree_pressfit, sbKeepDist, area_bound)
+
+    problem_list = []
+    for point in point_list:
+        problem = formObject(point.face, point.label)
+        problem.ViewObject.LineColor = error_line_color
+        problem.ViewObject.ShapeColor = error_shape_color
+        problem_list.append(problem)
+
+    # Create layer_problem
+    layer_pressfit_pins_support = App.ActiveDocument.addObject('App::DocumentObjectGroup', 'press_pins_support')
+    layer_pressfit_pins_support.Group = problem_list
+    layer_pressfit_pins_support.Label = "[ERROR]Pressfit Pins do not keep safe Distance with Support_Block in {}mm".format(sbKeepDist)
+    export_list.append(layer_pressfit_pins_support)
     #===================================================
     # Export DWG
     #===================================================
-    #import importDWG
-    #importDWG.export(export_list,output_file_path)
-    # Reset the parameter PrefPCAPLayers
-    #pcaplib.set_param("prefPCAPLayers", "")
+    import importDWG
+    importDWG.export(export_list,output_file_path)
     end=time()
 
     App.Console.PrintMessage("t = {}s\n".format(end- start))
 
 
-def findStopBlockWire(layer_stopBlock):
-    l_wires = layer_stopBlock.wire_list
-    max_wires = []
-    enclosed_wires = [0] * len(l_wires)
-    for i, l_wire1 in enumerate(l_wires):
-        if enclosed_wires[i] == 1:
-            continue
-        for j, l_wire2 in enumerate(l_wires):
-            if i == j or enclosed_wires[j] == 1:
-                continue
-            if bboxCheck(l_wire1, l_wire2): # l_wire1 encloses l_wire2
-                enclosed_wires[j] = 1
-
-    for idx, value in enumerate(enclosed_wires):
-        if not value: # Means the wire is not enclosed by other wires
-            max_wires.append(l_wires[idx])
-
-    return max_wires
 
 def listShow(shape_list):
     for sh in shape_list:
