@@ -7,6 +7,23 @@ def get_param(param_name):
     FSParam = FreeCAD.ParamGet("User parameter:BaseApp/Preferences/Mod/PCAP")
     return FSParam.GetString(param_name)
 
+# Router
+def get_rt_hole_width():
+    return get_param("rtHoleWidth")
+def get_rt_hole_add_len():
+    return get_param("rtHoleAddLen")
+def get_rt_d_guide_pin_inside():
+    return get_param("rtDGuidePinInside")
+def get_rt_d_guide_pin_break_away():
+    return get_param("rtDGuidePinBreakAway")
+
+def get_rt_layer_of_guide_pin():
+    return get_param("rtLayerOfGuidePin")
+def get_rt_layer_of_router_edge():
+    return get_param("rtLayerOfRouterEdge")
+def get_rt_layers():
+    return get_param("rtLayers")
+
 # Wave
 def get_pcap_dxf_file_path():
     return get_param("prefPCAPDXFFilePath")
