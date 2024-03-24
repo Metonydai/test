@@ -399,7 +399,7 @@ class Layer():
             return 0
 
 
-def checkForProblem(layer_selected_list, quad_tree, dr, area_bound):
+def checkForProblem(layer_selected_list, quad_tree, dr):
     result = []
     for layer in layer_selected_list:
         layer.createFace(overlap_check=True)
@@ -409,15 +409,7 @@ def checkForProblem(layer_selected_list, quad_tree, dr, area_bound):
                 # Already Checked
                 if point.check == True:
                     continue
-                # Point is Circle
-                #if len(point.wire.Edges) == 1:
-                #    point.check = True
-                #    continue
-                # Area Check
-                #if point.face.Area >= area_bound:
-                #    point.check = True
-                #    continue
-                # Inside Check
+                # Not inside the grooving region
                 if not l_face.isInside(point.wire.CenterOfMass, 0.0, True):
                     continue
 
@@ -546,12 +538,13 @@ def run_router():
     # Get values from pcaplib
     dr = float(pcaplib.get_pcap_dr())
     area_bound = float(pcaplib.get_pcap_area_bound())
-    sbKeepDist = float(pcaplib.get_press_sb_keep_dist())
-    blockKeepDist = float(pcaplib.get_press_block_keep_dist())
-    distSupport = float(pcaplib.get_press_dist_support())
+    rtHoleWidth = float(pcaplib.get_rt_hole_width)
+    rtHoleAddLen = float(pcaplib.get_rt_hole_add_len)
+    rtDGuidePinInside = float(pcaplib.get_rt_d_guide_pin_inside)
+    rtDGuidePinBreakAway = float(pcaplib.get_rt_d_guide_pin_break_away)
 
     # Initialize Custom Layer Object
-    if not pcaplib.get_press_layers():
+    if not pcaplib.get_rt_layers():
         App.Console.PrintWarning("Please select the layers and then press the \"Save Setting\" button!\n")
         return -1
     if not pcaplib.get_pcap_layer_of_botsilk():
@@ -563,17 +556,14 @@ def run_router():
     #if not pcaplib.get_pcap_layer_of_botmask():
     #    App.Console.PrintWarning("Cannot find Layer Botmask.\n")
     #    return -1
-    if not pcaplib.get_press_layer_of_fixed_pin():
-        App.Console.PrintWarning("Cannot find Layer Fixed_Pin.\n")
+    if not pcaplib.get_rt_layer_of_guide_pin():
+        App.Console.PrintWarning("Cannot find Layer Guide_Pin.\n")
         return -1
-    if not pcaplib.get_press_layer_of_support_pin():
-        App.Console.PrintWarning("Cannot find Layer Supprot_Pin.\n")
+    if not pcaplib.get_pcap_layer_of_open():
+        App.Console.PrintWarning("Cannot find Layer Open.\n")
         return -1
-    if not pcaplib.get_press_layer_of_stop_block():
+    if not pcaplib.get_rt_layer_of_router_edge():
         App.Console.PrintWarning("Cannot find Layer Stop_Block.\n")
-        return -1
-    if not pcaplib.get_press_layer_of_pressfit():
-        App.Console.PrintWarning("Cannot find Layer Pressfit.\n")
         return -1
 
     layer_selected_list = []
@@ -599,40 +589,27 @@ def run_router():
         App.Console.PrintWarning("Layer Botpaste is empty. Please check the DXF file.\n")
         return -1
 
-    # Create fixedPin Layer
-    fixedPin = Layer(pcaplib.get_press_layer_of_fixed_pin())
-    fixedPin.createFace(overlap_check=False)
-    if fixedPin.getLayer().Group == []:
-        App.Console.PrintWarning("Layer Fixed_Pin is empty. Please check the DXF file.\n")
+    # Create guidePin Layer
+    guidePin = Layer(pcaplib.get_rt_layer_of_guide_pin)
+    guidePin.createFace(overlap_check=False)
+    if guidePin.getLayer().Group == []:
+        App.Console.PrintWarning("Layer Guide_Pin is empty. Please check the DXF file.\n")
         return -1
 
-    # Create supportPin Layer
-    supportPin = Layer(pcaplib.get_press_layer_of_support_pin())
-    supportPin.createFace(overlap_check=False)
-    if supportPin.getLayer().Group == []:
-        App.Console.PrintWarning("Layer Support_Pin is empty. Please check the DXF file.\n")
+    # Create open Layer
+    open = Layer(pcaplib.get_pcap_layer_of_open())
+    open.createFace(overlap_check=False)
+    if open.getLayer().Group == []:
+        App.Console.PrintWarning("Layer Open is empty. Please check the DXF file.\n")
         return -1
     
-    # Create supportBlock Layer
-    supportBlock = Layer(pcaplib.get_press_layer_of_support_block())
-    supportBlock.createFace(overlap_check=False)
-    if supportBlock.getLayer().Group == []:
-        App.Console.PrintWarning("Layer Support_Block is empty. Please check the DXF file.\n")
+    # Create routerEdge Layer
+    routerEdge = Layer(pcaplib.get_rt_layer_of_router_edge())
+    routerEdge.createFace(overlap_check=False)
+    if routerEdge.getLayer().Group == []:
+        App.Console.PrintWarning("Layer Router_Edge is empty. Please check the DXF file.\n")
         return -1
     
-    # Create stopBlock Layer
-    stopBlock = Layer(pcaplib.get_press_layer_of_stop_block())
-    stopBlock.createFace(overlap_check=False)
-    if stopBlock.getLayer().Group == []:
-        App.Console.PrintWarning("Layer Stop_Block is empty. Please check the DXF file.\n")
-        return -1
-
-    # Create pressfit Layer
-    pressfit = Layer(pcaplib.get_press_layer_of_pressfit())
-    pressfit.createFace(overlap_check=False)
-    if pressfit.getLayer().Group == []:
-        App.Console.PrintWarning("Layer Pressfit is empty. Please check the DXF file.\n")
-        return -1
     #===================================================
     # Function 1 : Interference check (Grooving)
     #===================================================
@@ -646,18 +623,13 @@ def run_router():
     # Add botsilk, botpaste, fixedPin, supportPin, supportBlock, stopBlock, pressfit 
     export_list.append(botsilk.getLayer())
     export_list.append(botpaste.getLayer())
-    export_list.append(fixedPin.getLayer())
-    export_list.append(supportPin.getLayer())
-    export_list.append(supportBlock.getLayer())
-    export_list.append(stopBlock.getLayer())
-    export_list.append(pressfit.getLayer())
+    export_list.append(open.getLayer())
+    export_list.append(routerEdge.getLayer())
+    export_list.append(guidePin.getLayer())
 
     # Determine the Range and Create QuadTreeNode
     botsilk_bbox = botsilk.getLayer().Shape.BoundBox
     quad_tree = QuadTree(botsilk_bbox.XMin, botsilk_bbox.YMin, botsilk_bbox.XMax, botsilk_bbox.YMax)
-
-    # wire supportBlock
-    wire_supportBlock = supportBlock.wire_list[0]
 
     # Insert Node in quad_tree (botsilk)
     for wire, face, label in zip(botsilk.wire_list, botsilk.face_list, botsilk.label_list):
@@ -685,7 +657,7 @@ def run_router():
     error_line_color = (1.0, 1.0, 0.0)
     error_shape_color = (1.0, 0.0, 0.0)
 
-    point_list = checkForProblem(layer_selected_list, quad_tree, dr, area_bound)
+    point_list = checkForProblem(layer_selected_list, quad_tree, dr)
 
     problem_list = []
     for point in point_list:
@@ -700,12 +672,8 @@ def run_router():
     layer_problem.Label = "[ERROR]Interference Within {}mm".format(dr)
     export_list.append(layer_problem)
 
-    # Query for supportBlock BoundBox to find point.check is False
-    included_point = query_range(quad_tree, wire_supportBlock.BoundBox)
-    not_check_list = []
-    for pt in included_point:
-        if not pt.check:
-            not_check_list.append(pt)
+    # New function: query for quad_tree to find point.check is False
+    not_check_list = query_not_checked(quad_tree)
     problem_list = []
     for point in not_check_list:
         problem = formObject(point.face, point.label)
@@ -716,8 +684,11 @@ def run_router():
     # Create layer_problem_interference
     layer_problem_interference = App.ActiveDocument.addObject('App::DocumentObjectGroup', 'Problem_Interference')
     layer_problem_interference.Group = problem_list
-    layer_problem_interference.Label = "[ERROR]Interference without Grooving"
+    layer_problem_interference.Label = "[ERROR]Interference without Grooving".format(dr)
     export_list.append(layer_problem_interference)
+
+    # del quad_tree
+    del quad_tree
 
     #===================================================
     # Function 2: Keep distance with the Stop_Block
@@ -728,13 +699,13 @@ def run_router():
     # Get wires_stopBlock
     wires_stopBlock = findStopBlockWire(stopBlock)
 
-    searchDist = blockKeepDist + 20.0
+    searchDist = blockKeepDist + 15.0
     do_not_keep_stopBlock = []
     # blockKeepDist
     for stopB in wires_stopBlock:
         stopB_face = Part.Face(stopB)
         stopB_bbox = stopB.BoundBox
-        search_bbox = App.BoundBox(stopB_bbox.getPoint(0)-App.Vector(searchDist,searchDist,0), stopB_bbox.getPoint(1)+ App.Vector(searchDist,searchDist,0))
+        search_bbox = App.BoundBox(stopB_bbox.getPoint(0)-App.Vector(searchDist,searchDist,0), stopB_bbox.getPoint(2)+ App.Vector(searchDist,searchDist,0))
         included = query_range(quad_tree, search_bbox)
         for point in included:
             # Set all circle check == True, Hole or VIA Hole
@@ -790,7 +761,7 @@ def run_router():
         cen = App.Vector(p[0], p[1], 0)
         circle = Part.Wire(Part.makeCircle(R, cen))
         searchDist = distSupport + 20.0
-        search_bbox = App.BoundBox(circle.BoundBox.getPoint(0)- App.Vector(searchDist,searchDist,0), circle.BoundBox.getPoint(1)+ App.Vector(searchDist,searchDist,0))
+        search_bbox = App.BoundBox(circle.BoundBox.getPoint(0)- App.Vector(searchDist,searchDist,0), circle.BoundBox.getPoint(2)+ App.Vector(searchDist,searchDist,0))
         included = query_range(quad_tree, search_bbox)
         for point in included:
             # Set all circle check == True, Hole or VIA Hole
@@ -1025,7 +996,7 @@ def run_unloader():
     error_line_color = (1.0, 1.0, 0.0)
     error_shape_color = (1.0, 0.0, 0.0)
 
-    point_list = checkForProblem(layer_selected_list, quad_tree, dr, area_bound)
+    point_list = checkForProblem(layer_selected_list, quad_tree, dr)
 
     problem_list = []
     for point in point_list:
@@ -1419,7 +1390,7 @@ def run_wave():
     error_line_color = (1.0, 1.0, 0.0)
     error_shape_color = (1.0, 0.0, 0.0)
 
-    point_list = checkForProblem(layer_selected_list, quad_tree, dr, area_bound)
+    point_list = checkForProblem(layer_selected_list, quad_tree, dr)
 
     problem_list = []
     for point in point_list:
@@ -1821,7 +1792,7 @@ def run_press():
     error_line_color = (1.0, 1.0, 0.0)
     error_shape_color = (1.0, 0.0, 0.0)
 
-    point_list = checkForProblem(layer_selected_list, quad_tree, dr, area_bound)
+    point_list = checkForProblem(layer_selected_list, quad_tree, dr)
 
     problem_list = []
     for point in point_list:
@@ -1870,7 +1841,7 @@ def run_press():
     for stopB in wires_stopBlock:
         stopB_face = Part.Face(stopB)
         stopB_bbox = stopB.BoundBox
-        search_bbox = App.BoundBox(stopB_bbox.getPoint(0)-App.Vector(searchDist,searchDist,0), stopB_bbox.getPoint(1)+ App.Vector(searchDist,searchDist,0))
+        search_bbox = App.BoundBox(stopB_bbox.getPoint(0)-App.Vector(searchDist,searchDist,0), stopB_bbox.getPoint(2)+ App.Vector(searchDist,searchDist,0))
         included = query_range(quad_tree, search_bbox)
         for point in included:
             # Set all circle check == True, Hole or VIA Hole
@@ -1925,8 +1896,8 @@ def run_press():
         # Create a circle for every p in point_set
         cen = App.Vector(p[0], p[1], 0)
         circle = Part.Wire(Part.makeCircle(R, cen))
-        searchDist = distSupport + 20.0
-        search_bbox = App.BoundBox(circle.BoundBox.getPoint(0)- App.Vector(searchDist,searchDist,0), circle.BoundBox.getPoint(1)+ App.Vector(searchDist,searchDist,0))
+        searchDist = distSupport + 15.0
+        search_bbox = App.BoundBox(circle.BoundBox.getPoint(0)- App.Vector(searchDist,searchDist,0), circle.BoundBox.getPoint(2)+ App.Vector(searchDist,searchDist,0))
         included = query_range(quad_tree, search_bbox)
         for point in included:
             # Set all circle check == True, Hole or VIA Hole
@@ -2010,8 +1981,8 @@ def run_press():
     #===================================================
     # Export DWG
     #===================================================
-    import importDWG
-    importDWG.export(export_list,output_file_path)
+    #import importDWG
+    #importDWG.export(export_list,output_file_path)
     end=time()
 
     App.Console.PrintMessage("t = {}s\n".format(end- start))
