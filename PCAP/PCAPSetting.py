@@ -52,7 +52,8 @@ class Setting:
         #=====router=====
         self.widget.rtDr.setText(p.GetString("prefPCAPDr", "3.0")) #shared_1
         self.widget.rtAreaBound.setText(p.GetString("prefPCAPAreaBound", "500")) #shared_2
-        self.widget.rtDboard.setText(p.GetString("prefPCAPDboard", "0.15")) #shared_3
+        self.widget.rtDGuidePinInside.setText(p.GetString("rtDGuidePinInside", "0.08")) 
+        self.widget.rtDGuidePinBreakAway.setText(p.GetString("rtDGuidePinBreakAway", "0.15")) 
         self.widget.rtHoleWidth.setText(p.GetString("rtHoleWidth", "6.0"))
         self.widget.rtHoleAddLen.setText(p.GetString("rtHoleAddLen", "3.0"))
         #=====unloader=====
@@ -89,20 +90,21 @@ class Setting:
     def on_saveButton_clicked(self):
         if self.widget.tabWidget.currentIndex() == 0:
             pcaplib.set_param("prefPCAPDr", self.widget.rtDr.text())
-            pcaplib.set_param("prefPCAPDboard", self.widget.rtDboard.text())
+            pcaplib.set_param("rtDGuidePinInside", self.widget.rtDGuidePinInside.text())
+            pcaplib.set_param("rtDGuidePinBreakAway", self.widget.rtDGuidePinBreakAway.text())
             pcaplib.set_param("rtHoleWidth", self.widget.rtHoleWidth.text())
             pcaplib.set_param("rtHoleAddLen", self.widget.rtHoleAddLen.text())
             pcaplib.set_param("prefPCAPAreaBound", self.widget.rtAreaBound.text())
 
             pcaplib.set_param("prefPCAPLayerOfBotsilk", self.widget.rtLayerOfBotsilk.currentText())
             pcaplib.set_param("prefPCAPLayerOfBotpaste", self.widget.rtLayerOfBotpaste.currentText())
-            pcaplib.set_param("prefPCAPLayerOfBoardSink", self.widget.rtLayerOfBoardSink.currentText())
+            pcaplib.set_param("rtLayerOfGuidePin", self.widget.rtLayerOfGuidePin.currentText())
             pcaplib.set_param("prefPCAPLayerOfOpen", self.widget.rtLayerOfOpen.currentText())
             pcaplib.set_param("rtLayerOfRouterEdge", self.widget.rtLayerOfRouterEdge.currentText())
             delimiter = ','
             pcaplib.set_param("rtLayers", delimiter.join(self.get_item_text_from_selected_items(self.widget.rtListOfLayers)))
             if self.widget.rtLayerOfBotsilk.currentText() and self.widget.rtLayerOfBotpaste.currentText() and self.widget.rtLayerOfRouterEdge.currentText() \
-            and self.widget.rtLayerOfBoardSink.currentText() and self.widget.rtLayerOfOpen.currentText() and self.get_item_text_from_selected_items(self.widget.rtListOfLayers):
+            and self.widget.rtLayerOfGuidePin.currentText() and self.widget.rtLayerOfOpen.currentText() and self.get_item_text_from_selected_items(self.widget.rtListOfLayers):
                 self.widget.playButton.setDisabled(False)
         elif self.widget.tabWidget.currentIndex() == 1:
             pcaplib.set_param("prefPCAPDr", self.widget.ulDr.text())
@@ -218,6 +220,7 @@ class Setting:
         obj_botmask = []
         obj_open = []
         obj_board_sink = []
+        obj_guide_pin = []
         obj_fixed_pin = []
         obj_support_pin = []
         obj_support_block = []
@@ -236,6 +239,8 @@ class Setting:
                 obj_open.append(objects[i])
             elif re.search('2\.5|1\.6', objects[i].lower()):
                 obj_board_sink.append(objects[i])
+            elif re.search('guide.*pin|pin.*guide', objects[i].lower()):
+                obj_guide_pin.append(objects[i])
             elif re.search('fixed.*pin|pin.*fixed', objects[i].lower()):
                 obj_fixed_pin.append(objects[i])
             elif re.search('support.*pin|pin.*support', objects[i].lower()):
@@ -254,17 +259,17 @@ class Setting:
         # Add Layers For Unloader : tabWidget index = 0
         self.widget.rtLayerOfBotsilk.addItems(obj_botsilk)
         self.widget.rtLayerOfBotpaste.addItems(obj_botpaste)
-        self.widget.rtLayerOfBoardSink.addItems(obj_board_sink)
+        self.widget.rtLayerOfGuidePin.addItems(obj_guide_pin)
         self.widget.rtLayerOfOpen.addItems(obj_open)
         self.widget.rtLayerOfRouterEdge.addItems(obj_edge)
-        self.widget.rtListOfLayers.addItems(obj_array + obj_botmask + obj_fixed_pin + obj_stop_block + obj_pressfit + obj_support_pin + obj_support_block)
+        self.widget.rtListOfLayers.addItems(obj_array + obj_botmask + obj_fixed_pin + obj_stop_block + obj_pressfit + obj_support_pin + obj_support_block + obj_board_sink)
 
         # Add Layers For Unloader : tabWidget index = 1
         self.widget.ulLayerOfBotsilk.addItems(obj_botsilk)
         self.widget.ulLayerOfBotpaste.addItems(obj_botpaste)
         self.widget.ulLayerOfBotmask.addItems(obj_botmask)
         self.widget.ulLayerOfBoardSink.addItems(obj_board_sink)
-        self.widget.ulListOfLayers.addItems(obj_array + obj_open + obj_fixed_pin + obj_stop_block + obj_pressfit + obj_edge+ obj_support_pin + obj_support_block)
+        self.widget.ulListOfLayers.addItems(obj_array + obj_open + obj_fixed_pin + obj_stop_block + obj_pressfit + obj_edge+ obj_support_pin + obj_support_block + obj_guide_pin)
 
         # Add Layers For Wave_Solder : tabWidget index = 2
         self.widget.prefPCAPLayerOfBotsilk.addItems(obj_botsilk)
@@ -272,7 +277,7 @@ class Setting:
         self.widget.prefPCAPLayerOfBotmask.addItems(obj_botmask)
         self.widget.prefPCAPLayerOfOpen.addItems(obj_open)
         self.widget.prefPCAPLayerOfBoardSink.addItems(obj_board_sink)
-        self.widget.prefPCAPListOfLayers.addItems(obj_array + obj_fixed_pin + obj_stop_block + obj_pressfit + obj_edge+ obj_support_pin + obj_support_block)
+        self.widget.prefPCAPListOfLayers.addItems(obj_array + obj_fixed_pin + obj_stop_block + obj_pressfit + obj_edge+ obj_support_pin + obj_support_block + obj_guide_pin)
         
         # Add Layers For Press_Fit : tabWidget index = 3
         self.widget.pressLayerOfBotsilk.addItems(obj_botsilk)
@@ -282,7 +287,7 @@ class Setting:
         self.widget.pressLayerOfSupportBlock.addItems(obj_support_block)
         self.widget.pressLayerOfStopBlock.addItems(obj_stop_block)
         self.widget.pressLayerOfPressfit.addItems(obj_pressfit)
-        self.widget.pressListOfLayers.addItems(obj_array + obj_botmask +  obj_board_sink + obj_open + obj_edge)
+        self.widget.pressListOfLayers.addItems(obj_array + obj_botmask +  obj_board_sink + obj_open + obj_edge + obj_guide_pin)
 
         # layers_open : for open switch swap use
         #self.layers_open = obj_open 
@@ -298,7 +303,7 @@ class Setting:
         # Delete Layers For Router : tabWidget index = 0
         self.widget.rtLayerOfBotsilk.clear()
         self.widget.rtLayerOfBotpaste.clear()
-        self.widget.rtLayerOfBoardSink.clear()
+        self.widget.rtLayerOfGuidePin.clear()
         self.widget.rtLayerOfOpen.clear()
         self.widget.rtLayerOfRouterEdge.clear()
         self.widget.rtListOfLayers.clear()
@@ -343,8 +348,8 @@ class Setting:
                 l.append(self.widget.rtLayerOfBotsilk.currentText())
             if (self.widget.rtLayerOfBotpaste.currentText()):
                 l.append(self.widget.rtLayerOfBotpaste.currentText())
-            if (self.widget.rtLayerOfBoardSink.currentText()):
-                l.append(self.widget.rtLayerOfBoardSink.currentText())
+            if (self.widget.rtLayerOfGuidePin.currentText()):
+                l.append(self.widget.rtLayerOfGuidePin.currentText())
             if (self.widget.rtLayerOfOpen.currentText()):
                 l.append(self.widget.rtLayerOfOpen.currentText())
             if (self.widget.rtLayerOfRouterEdge.currentText()):
