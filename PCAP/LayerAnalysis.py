@@ -28,7 +28,7 @@ class Dot:
 
 
 class Point:
-    def __init__(self, w, f, l):
+    def __init__(self, w, f="None", l=""):
         self.wire = w
         self.face = f
         self.label = l
@@ -243,9 +243,29 @@ def rayBoundBox(origin, udir, length, epsilon=0.0001):
         return App.BoundBox(V1 + 0.5*epsilon*App.Vector(-1,0,0), V2 + 0.5*epsilon*App.Vector(1,0,0))
     return App.BoundBox(V1, V2)
 
-def findNextDot(pdot, quad_tree):
+def findNextArc(center, udir, quad_tree, searchLength = 30):
+    epsilon = 0.0001
+
+    ray_bbox = rayBoundBox(center, udir, searchLength, epsilon)
+    find_pts = query_range(quad_tree, ray_bbox)
+    if not find_pts:
+        return None
+    find_pts.sort(key = lambda f_pt : (f_pt.wire.CenterOfMass - center).dot(udir)) # projection on pdot.udir
+    # Find Linear Equation : ax + by + c = 0
+    # c = -a*x0 - b*y0
+    a = -udir.y
+    b = udir.x
+    c = -a * center.x - b * center.y
+
+    for f_pt in find_pts:
+        if f_pt.x == center.x and f_pt.y == center.y:
+            continue
+        if abs(a * f_pt.x + b * f_pt.y + c) < 0.01 and not f_pt.check: # f_dot colinear
+            return f_pt
+    return None
+
+def findNextDot(pdot, quad_tree, searchLength = 30):
     epsilon = 0.00000001
-    searchLength = 30
 
     ray_bbox = rayBoundBox(pdot.point, pdot.udir, searchLength, epsilon)
     find_dots = query_range(quad_tree, ray_bbox)
@@ -398,6 +418,14 @@ class Layer():
                 return float('inf')
             return 0
 
+class specialLayer(Layer):
+    def __init__(self, label):
+        self.label = label
+        self.wire_list = self.getWire()
+    def getLayer(self):
+        return super().getLayer()
+    def getWire(self):
+        return [feature.Shape for feature in self.getLayer().Group]
 
 def checkForProblem(layer_selected_list, quad_tree, dr):
     result = []
@@ -538,10 +566,10 @@ def run_router():
     # Get values from pcaplib
     dr = float(pcaplib.get_pcap_dr())
     area_bound = float(pcaplib.get_pcap_area_bound())
-    rtHoleWidth = float(pcaplib.get_rt_hole_width)
-    rtHoleAddLen = float(pcaplib.get_rt_hole_add_len)
-    rtDGuidePinInside = float(pcaplib.get_rt_d_guide_pin_inside)
-    rtDGuidePinBreakAway = float(pcaplib.get_rt_d_guide_pin_break_away)
+    rtHoleWidth = float(pcaplib.get_rt_hole_width())
+    rtHoleAddLen = float(pcaplib.get_rt_hole_add_len())
+    rtDGuidePinInside = float(pcaplib.get_rt_d_guide_pin_inside())
+    rtDGuidePinBreakAway = float(pcaplib.get_rt_d_guide_pin_break_away())
 
     # Initialize Custom Layer Object
     if not pcaplib.get_rt_layers():
@@ -563,11 +591,11 @@ def run_router():
         App.Console.PrintWarning("Cannot find Layer Open.\n")
         return -1
     if not pcaplib.get_rt_layer_of_router_edge():
-        App.Console.PrintWarning("Cannot find Layer Stop_Block.\n")
+        App.Console.PrintWarning("Cannot find Layer Router_Edge.\n")
         return -1
 
     layer_selected_list = []
-    for layer_label in pcaplib.get_press_layers().split(','):
+    for layer_label in pcaplib.get_rt_layers().split(','):
         #print(layer_label)
         layer_selected_list.append(Layer(layer_label))
 
@@ -590,7 +618,7 @@ def run_router():
         return -1
 
     # Create guidePin Layer
-    guidePin = Layer(pcaplib.get_rt_layer_of_guide_pin)
+    guidePin = Layer(pcaplib.get_rt_layer_of_guide_pin())
     guidePin.createFace(overlap_check=False)
     if guidePin.getLayer().Group == []:
         App.Console.PrintWarning("Layer Guide_Pin is empty. Please check the DXF file.\n")
@@ -604,8 +632,7 @@ def run_router():
         return -1
     
     # Create routerEdge Layer
-    routerEdge = Layer(pcaplib.get_rt_layer_of_router_edge())
-    routerEdge.createFace(overlap_check=False)
+    routerEdge = specialLayer(pcaplib.get_rt_layer_of_router_edge())
     if routerEdge.getLayer().Group == []:
         App.Console.PrintWarning("Layer Router_Edge is empty. Please check the DXF file.\n")
         return -1
@@ -691,11 +718,72 @@ def run_router():
     del quad_tree
 
     #===================================================
-    # Function 2: Keep distance with the Stop_Block
+    # Function 2: Get Router_Edge and Check Open_Hole Length and Width
     #===================================================
-    # Set all points in quad_tree False in order to analyze
-    initialize_tree(quad_tree)
+    routerEdge_bbox = findBoundBox(routerEdge.wire_list)
+    # Create quadtree_rtEdge
+    quadtree_rtEdge = QuadTree(routerEdge_bbox.XMin, routerEdge_bbox.YMin, routerEdge_bbox.XMax, routerEdge_bbox.YMax)
+    rtEdge_Point = [Point(w) for w in routerEdge.wire_list]
 
+    epsilon = 0.0001
+    pi = 3.1415926535900773
+    for pt in rtEdge_Point:
+        # check = True stands for not half-circle
+        w = pt.wire
+        if len(w.Edges) >= 1:
+            pt.check = True
+            continue
+        e = w.Edges[0]
+        if not e.Curve.TyepId == "Part::GemoCircle":
+            pt.check = True
+            continue
+        th1, th2 = e.ParameterRange
+
+        if abs(th1) < epsilon and abs(th2 - pi) < epsilon: #half circle
+            quadtree_rtEdge.insert(pt)
+        else:
+            pt.check = True
+
+    # Group rtEdge_pair
+    rtEdge_pair = []
+    search_dist = 10.0
+    for pt in rtEdge_Point:
+        if pt.check: #not half circle
+            continue
+        w = pt.wire
+        e = w.Edges[0]
+        V1 = (e.valueAt(pi/2) - e.CenterOfMass).normalize() #from center to arc_buldge, unit vector
+        V2 = e.Vertexes[1].Point - e.Vertexes[0].Point #from start to end
+        # the z value for V1 cross V2 is positive when arc is left-open 
+        if V1.x * V2.y - V1.y * V2.x > 0: # left-open
+            next_pt = findNextArc(e.CenterOfMass, V1, quadtree_rtEdge, search_dist)
+            if next_pt:
+                # Check for next_w
+                next_w = next_pt.wire
+                next_e = next_w.Edges[0]
+                next_V1 = (next_e.valueAt(pi/2) - next_e.CenterOfMass) #from center to arc_buldge, unit vector
+                next_V2 = next_e.Vertexes[1].Point - next_e.Vertexes[0].Point #from start to end
+                if next_V1.x * next_V2.y - next_V1.y * next_V2.x < 0: # right-open
+                    pt.check = True
+                    next_pt = True
+                    rtEdge_pair.append([e, next_e])
+        else: # right-open
+            next_pt = findNextArc(e.CenterOfMass, V1, quadtree_rtEdge, search_dist)
+            if next_pt:
+                # Check for next_w
+                next_w = next_pt.wire
+                next_e = next_w.Edges[0]
+                next_V1 = (next_e.valueAt(pi/2) - next_e.CenterOfMass) #from center to arc_buldge, unit vector
+                next_V2 = next_e.Vertexes[1].Point - next_e.Vertexes[0].Point #from start to end
+                if next_V1.x * next_V2.y - next_V1.y * next_V2.x > 0: # left-open
+                    pt.check = True
+                    next_pt = True
+                    rtEdge_pair.append([next_e, e])
+        
+    for left_arc, right_arc in rtEdge_pair:
+        Part.show(left_arc.fuse(right_arc))
+
+    """    
     # Get wires_stopBlock
     wires_stopBlock = findStopBlockWire(stopBlock)
 
@@ -851,6 +939,7 @@ def run_router():
     end=time()
 
     App.Console.PrintMessage("t = {}s\n".format(end- start))
+    """
 
 def run_unloader():
     #===================================================
