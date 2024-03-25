@@ -250,7 +250,7 @@ def findNextArc(center, udir, quad_tree, searchLength = 30):
     find_pts = query_range(quad_tree, ray_bbox)
     if not find_pts:
         return None
-    find_pts.sort(key = lambda f_pt : (f_pt.wire.CenterOfMass - center).dot(udir)) # projection on pdot.udir
+    find_pts.sort(key = lambda f_pt : (f_pt.wire.CenterOfMass - center).dot(udir)) # projection on udir
     # Find Linear Equation : ax + by + c = 0
     # c = -a*x0 - b*y0
     a = -udir.y
@@ -260,7 +260,7 @@ def findNextArc(center, udir, quad_tree, searchLength = 30):
     for f_pt in find_pts:
         if f_pt.x == center.x and f_pt.y == center.y:
             continue
-        if abs(a * f_pt.x + b * f_pt.y + c) < 0.01 and not f_pt.check: # f_dot colinear
+        if abs(a * f_pt.x + b * f_pt.y + c) < epsilon and not f_pt.check: # f_dot colinear
             return f_pt
     return None
 
@@ -636,7 +636,7 @@ def run_router():
     if routerEdge.getLayer().Group == []:
         App.Console.PrintWarning("Layer Router_Edge is empty. Please check the DXF file.\n")
         return -1
-    
+    """ 
     #===================================================
     # Function 1 : Interference check (Grooving)
     #===================================================
@@ -716,6 +716,7 @@ def run_router():
 
     # del quad_tree
     del quad_tree
+    """
 
     #===================================================
     # Function 2: Get Router_Edge and Check Open_Hole Length and Width
@@ -724,17 +725,18 @@ def run_router():
     # Create quadtree_rtEdge
     quadtree_rtEdge = QuadTree(routerEdge_bbox.XMin, routerEdge_bbox.YMin, routerEdge_bbox.XMax, routerEdge_bbox.YMax)
     rtEdge_Point = [Point(w) for w in routerEdge.wire_list]
+    print(len(rtEdge_Point))
 
-    epsilon = 0.0001
+    epsilon = 0.001
     pi = 3.1415926535900773
     for pt in rtEdge_Point:
         # check = True stands for not half-circle
         w = pt.wire
-        if len(w.Edges) >= 1:
+        if len(w.Edges) > 1:
             pt.check = True
             continue
         e = w.Edges[0]
-        if not e.Curve.TyepId == "Part::GemoCircle":
+        if not e.Curve.TypeId == "Part::GeomCircle":
             pt.check = True
             continue
         th1, th2 = e.ParameterRange
@@ -747,6 +749,7 @@ def run_router():
     # Group rtEdge_pair
     rtEdge_pair = []
     search_dist = 10.0
+    i = 0
     for pt in rtEdge_Point:
         if pt.check: #not half circle
             continue
@@ -761,12 +764,13 @@ def run_router():
                 # Check for next_w
                 next_w = next_pt.wire
                 next_e = next_w.Edges[0]
-                next_V1 = (next_e.valueAt(pi/2) - next_e.CenterOfMass) #from center to arc_buldge, unit vector
-                next_V2 = next_e.Vertexes[1].Point - next_e.Vertexes[0].Point #from start to end
-                if next_V1.x * next_V2.y - next_V1.y * next_V2.x < 0: # right-open
+                next_V1 = (next_e.valueAt(pi/2) - next_e.CenterOfMass) #from center to arc_buldge
+                if V1.dot(next_V1) < 0: # right-open
                     pt.check = True
-                    next_pt = True
+                    next_pt.check = True
                     rtEdge_pair.append([e, next_e])
+            else:
+                print(f"e.Center : {e.CenterOfMass}")
         else: # right-open
             next_pt = findNextArc(e.CenterOfMass, V1, quadtree_rtEdge, search_dist)
             if next_pt:
@@ -774,11 +778,12 @@ def run_router():
                 next_w = next_pt.wire
                 next_e = next_w.Edges[0]
                 next_V1 = (next_e.valueAt(pi/2) - next_e.CenterOfMass) #from center to arc_buldge, unit vector
-                next_V2 = next_e.Vertexes[1].Point - next_e.Vertexes[0].Point #from start to end
-                if next_V1.x * next_V2.y - next_V1.y * next_V2.x > 0: # left-open
+                if V1.dot(next_V1) < 0: # left-open
                     pt.check = True
-                    next_pt = True
+                    next_pt.check = True
                     rtEdge_pair.append([next_e, e])
+            else:
+                print(f"e.Center : {e.CenterOfMass}")
         
     for left_arc, right_arc in rtEdge_pair:
         Part.show(left_arc.fuse(right_arc))
