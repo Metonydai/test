@@ -26,6 +26,69 @@ class Dot:
     def set_paired_dot(self, paired):
         self.paired = paired
 
+class PairedEdge:
+    def __init__(self, left_open, right_open):
+        self.left_open = left_open
+        self.right_open = right_open
+        self.C1 = left_open.Curve.Center
+        self.C2 = right_open.Curve.Center
+    def is_horizontal(self):
+        epsilon = 0.000001
+        return ((self.C1- self.C2).dot(App.Vector(0,1,0))) < epsilon
+
+class RTOpen:
+    def __init__(self, wire):
+        self.wire = wire
+        self.h_lines, self.v_lines = self.find_lines()
+        self.rtEdge_pair = []
+        self.strokes = 0
+    def find_lines(self):
+        epsilon = 0.000001
+        w = self.wire
+        h_lines = []
+        v_lines = []
+        for e in w.Edges:
+            if e.Curve.TypeId == 'Part::GeomLine':
+                e_tan = e.tangentAt(0)
+                if abs(e_tan.dot(App.Vector(0.0, 1.0, 0.0))) < epsilon: # h_lines
+                    h_lines.append(e)
+                elif abs(e_tan.dot(App.Vector(1.0, 0.0, 0.0))) < epsilon: # v_lines
+                    v_lines.append(e)
+        
+        h_lines.sort(key=lambda line: line.Vertexes[0].Point.y)       
+        v_lines.sort(key=lambda line: line.Vertexes[0].Point.x)       
+        return h_lines, v_lines
+    def find_pair_paralines(self):
+        if not self.rtEdge_pair:
+            return
+        paralines = [] # list of edges
+        for paired_edge in self.rtEdge_pair:
+            if (paired_edge.is_horizontal()):
+                paralines.append(self.find_adjacent_lines(paired_edge.C1.y, True))
+            else:
+                paralines.append(self.find_adjacent_lines(paired_edge.C1.x, False))
+            
+    def find_adjacent_lines(self, value, horizontal):           
+        if horizontal:
+            hl = self.h_lines
+            m = len(hl)
+            insert = False
+            idx = m // 2
+            while (not insert):
+                if hl[idx-1].Vertexes[0].Point.y <  value < hl[idx].Vertexes[1].Point.y:
+                    
+            
+
+            
+    def set_strokes(self, num):
+        self.strokes = num
+    def set_rtEdge_pair(self, pair_list):
+        self.rtEdge_pair = pair_list
+        self.strokes = len(pair_list)
+
+            
+        
+
 
 class Point:
     def __init__(self, w, f="None", l=""):
@@ -237,14 +300,14 @@ def rayBoundBox(origin, udir, length, epsilon=0.0001):
     # For 2D 
     V1 = origin + epsilon * udir # Try to add an epsilon along udir, to avoid find itself
     V2 = origin + length * udir
-    if udir.dot(App.Vector(0, 1, 0)) == 0: # x-dir
+    if abs(udir.dot(App.Vector(0, 1, 0))) < epsilon: # x-dir
         return App.BoundBox(V1 + 0.5*epsilon*App.Vector(0,-1,0), V2 + 0.5*epsilon*App.Vector(0,1,0))
-    if udir.dot(App.Vector(1, 0, 0)) == 0: # y-dir
+    if abs(udir.dot(App.Vector(1, 0, 0))) < epsilon: # y-dir
         return App.BoundBox(V1 + 0.5*epsilon*App.Vector(-1,0,0), V2 + 0.5*epsilon*App.Vector(1,0,0))
     return App.BoundBox(V1, V2)
 
 def findNextArc(center, udir, quad_tree, searchLength = 30):
-    epsilon = 0.0001
+    epsilon = 0.1
 
     ray_bbox = rayBoundBox(center, udir, searchLength, epsilon)
     find_pts = query_range(quad_tree, ray_bbox)
@@ -746,47 +809,36 @@ def run_router():
         else:
             pt.check = True
 
-    # Group rtEdge_pair
-    rtEdge_pair = []
-    search_dist = 10.0
-    i = 0
-    for pt in rtEdge_Point:
-        if pt.check: #not half circle
-            continue
-        w = pt.wire
-        e = w.Edges[0]
-        V1 = (e.valueAt(pi/2) - e.CenterOfMass).normalize() #from center to arc_buldge, unit vector
-        V2 = e.Vertexes[1].Point - e.Vertexes[0].Point #from start to end
-        # the z value for V1 cross V2 is positive when arc is left-open 
-        if V1.x * V2.y - V1.y * V2.x > 0: # left-open
-            next_pt = findNextArc(e.CenterOfMass, V1, quadtree_rtEdge, search_dist)
-            if next_pt:
-                # Check for next_w
-                next_w = next_pt.wire
-                next_e = next_w.Edges[0]
-                next_V1 = (next_e.valueAt(pi/2) - next_e.CenterOfMass) #from center to arc_buldge
-                if V1.dot(next_V1) < 0: # right-open
-                    pt.check = True
-                    next_pt.check = True
-                    rtEdge_pair.append([e, next_e])
-            else:
-                print(f"e.Center : {e.CenterOfMass}")
-        else: # right-open
-            next_pt = findNextArc(e.CenterOfMass, V1, quadtree_rtEdge, search_dist)
-            if next_pt:
-                # Check for next_w
-                next_w = next_pt.wire
-                next_e = next_w.Edges[0]
-                next_V1 = (next_e.valueAt(pi/2) - next_e.CenterOfMass) #from center to arc_buldge, unit vector
-                if V1.dot(next_V1) < 0: # left-open
-                    pt.check = True
-                    next_pt.check = True
-                    rtEdge_pair.append([next_e, e])
-            else:
-                print(f"e.Center : {e.CenterOfMass}")
+    # Find each open area
+    rtopen_list = []
+    for wire in open.wire_list:
+        rtopen = RTOpen(wire)
+        rtEdge_pair = []
+        rtEdges_Open = query_range(quadtree_rtEdge, wire.BoundBox) #list of Point(edge)
+        rtEdges_Open.sort(key=lambda pt : (pt.x, pt.y))
+
+        items = len(rtEdges_Open)
+        for idx in range(items):
+            pt_0 = rtEdges_Open[idx]
+            if pt_0.check: #not half circle
+                continue
+
+            pt_1 = rtEdges_Open[idx+1]
+            w = pt_0.wire
+            e = w.Edges[0]
+            V1 = (e.valueAt(pi/2) - e.CenterOfMass) #from center to arc_bulge
+            next_w = pt_1.wire
+            next_e = next_w.Edges[0]
+            next_V1 = (next_e.valueAt(pi/2) - next_e.CenterOfMass) #from center to arc_buldge
+            if V1.dot(next_V1) < 0: 
+                pt_0.check = True
+                pt_1.check = True
+                rtEdge_pair.append(PairedEdge(e, next_e))
+        rtopen.set_rtEdge_pair(rtEdge_pair)
+        rtopen_list.appen(rtopen)
         
-    for left_arc, right_arc in rtEdge_pair:
-        Part.show(left_arc.fuse(right_arc))
+    
+    
 
     """    
     # Get wires_stopBlock
