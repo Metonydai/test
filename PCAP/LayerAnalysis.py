@@ -67,21 +67,35 @@ class RTOpen:
                 paralines.append(self.find_adjacent_lines(paired_edge.C1.y, True))
             else:
                 paralines.append(self.find_adjacent_lines(paired_edge.C1.x, False))
+        return paralines
             
     def find_adjacent_lines(self, value, horizontal):           
         if horizontal:
             hl = self.h_lines
-            m = len(hl)
-            insert = False
-            idx = m // 2
-            while (not insert):
-                if hl[idx-1].Vertexes[0].Point.y <  value < hl[idx].Vertexes[1].Point.y:
-                    
-            
+            l, u = 0, len(hl)-1
+            mid = (l + u) // 2
+            while (l <= u):
+                if hl[mid].Vertexes[0].Point.y < value < hl[mid+1].Vertexes[0].Point.y:
+                    return [hl[mid], hl[mid+1]]
+                elif value >= hl[mid]:
+                    l = mid
+                else:
+                    u = mid
+                mid = (l + u) // 2
+        else:
+            vl = self.v_lines
+            l, u = 0, len(vl)-1
+            mid = (l + u) // 2
+            while (l <= u):
+                if vl[mid].Vertexes[0].Point.x < value < vl[mid+1].Vertexes[0].Point.x:
+                    return [vl[mid], vl[mid+1]]
+                elif value >= vl[mid]:
+                    l = mid
+                else:
+                    u = mid
+                mid = (l + u) // 2
 
             
-    def set_strokes(self, num):
-        self.strokes = num
     def set_rtEdge_pair(self, pair_list):
         self.rtEdge_pair = pair_list
         self.strokes = len(pair_list)
