@@ -32,17 +32,18 @@ class PairedEdge:
         self.right_open = right_open
         self.C1 = left_open.Curve.Center
         self.C2 = right_open.Curve.Center
+        self.C12_udir = (self.C2- self.C1).normalize()
     def is_horizontal(self):
         epsilon = 0.000001
-        return ((self.C1- self.C2).dot(App.Vector(0,1,0))) < epsilon
+        return abs((self.C1- self.C2).dot(App.Vector(0,1,0))) < epsilon
 
 class RTOpen:
     def __init__(self, wire):
         self.wire = wire
-        self.h_lines, self.v_lines = self.find_lines()
+        self.h_lines, self.v_lines = self._find_lines()
         self.rtEdge_pair = []
         self.strokes = 0
-    def find_lines(self):
+    def _find_lines(self):
         epsilon = 0.000001
         w = self.wire
         h_lines = []
@@ -58,18 +59,19 @@ class RTOpen:
         h_lines.sort(key=lambda line: line.Vertexes[0].Point.y)       
         v_lines.sort(key=lambda line: line.Vertexes[0].Point.x)       
         return h_lines, v_lines
+
     def find_pair_paralines(self):
         if not self.rtEdge_pair:
             return
         paralines = [] # list of edges
         for paired_edge in self.rtEdge_pair:
             if (paired_edge.is_horizontal()):
-                paralines.append(self.find_adjacent_lines(paired_edge.C1.y, True))
+                paralines.append(self._find_adjacent_lines(paired_edge.C1.y, True))
             else:
-                paralines.append(self.find_adjacent_lines(paired_edge.C1.x, False))
+                paralines.append(self._find_adjacent_lines(paired_edge.C1.x, False))
         return paralines
             
-    def find_adjacent_lines(self, value, horizontal):           
+    def _find_adjacent_lines(self, value, horizontal):           
         if horizontal:
             hl = self.h_lines
             l, u = 0, len(hl)-1
@@ -77,8 +79,8 @@ class RTOpen:
             while (l <= u):
                 if hl[mid].Vertexes[0].Point.y < value < hl[mid+1].Vertexes[0].Point.y:
                     return [hl[mid], hl[mid+1]]
-                elif value >= hl[mid]:
-                    l = mid
+                elif value >= hl[mid+1].Vertexes[0].Point.y:
+                    l = mid+1
                 else:
                     u = mid
                 mid = (l + u) // 2
@@ -89,20 +91,15 @@ class RTOpen:
             while (l <= u):
                 if vl[mid].Vertexes[0].Point.x < value < vl[mid+1].Vertexes[0].Point.x:
                     return [vl[mid], vl[mid+1]]
-                elif value >= vl[mid]:
-                    l = mid
+                elif value >= vl[mid+1].Vertexes[0].Point.x:
+                    l = mid+1
                 else:
                     u = mid
                 mid = (l + u) // 2
-
             
     def set_rtEdge_pair(self, pair_list):
         self.rtEdge_pair = pair_list
         self.strokes = len(pair_list)
-
-            
-        
-
 
 class Point:
     def __init__(self, w, f="None", l=""):
@@ -632,6 +629,7 @@ def findStopBlockWire(layer_stopBlock):
 
 def run_router():
     start = time()
+    epsilon = 0.000001
 
     # Determine the output folder
     filePath = pcaplib.get_pcap_dxf_file_path()
@@ -804,7 +802,6 @@ def run_router():
     rtEdge_Point = [Point(w) for w in routerEdge.wire_list]
     print(len(rtEdge_Point))
 
-    epsilon = 0.001
     pi = 3.1415926535900773
     for pt in rtEdge_Point:
         # check = True stands for not half-circle
@@ -818,18 +815,20 @@ def run_router():
             continue
         th1, th2 = e.ParameterRange
 
-        if abs(th1) < epsilon and abs(th2 - pi) < epsilon: #half circle
+        if abs(th1) < 0.005 and abs(th2 - pi) < 0.005: #half circle
             quadtree_rtEdge.insert(pt)
         else:
             pt.check = True
 
     # Find each open area
     rtopen_list = []
+    problem_rt_width_sh_list = []
+    problem_rt_addLen_sh_list = []
     for wire in open.wire_list:
         rtopen = RTOpen(wire)
         rtEdge_pair = []
         rtEdges_Open = query_range(quadtree_rtEdge, wire.BoundBox) #list of Point(edge)
-        rtEdges_Open.sort(key=lambda pt : (pt.x, pt.y))
+        rtEdges_Open.sort(key=lambda pt : (pt.wire.Edges[0].Curve.Center.x, pt.wire.Edges[0].Curve.Center.y))
 
         items = len(rtEdges_Open)
         for idx in range(items):
@@ -840,18 +839,116 @@ def run_router():
             pt_1 = rtEdges_Open[idx+1]
             w = pt_0.wire
             e = w.Edges[0]
-            V1 = (e.valueAt(pi/2) - e.CenterOfMass) #from center to arc_bulge
+            V1 = (e.valueAt(pi/2) - e.Curve.Center) #from center to arc_bulge
             next_w = pt_1.wire
             next_e = next_w.Edges[0]
-            next_V1 = (next_e.valueAt(pi/2) - next_e.CenterOfMass) #from center to arc_buldge
+            next_V1 = (next_e.valueAt(pi/2) - next_e.Curve.Center) #from center to arc_buldge
             if V1.dot(next_V1) < 0: 
+                # Take last pair to compare
+                if rtEdge_pair:
+                    cen1 = e.Curve.Center
+                    cen2 = next_e.Curve.Center
+                    last_pair = rtEdge_pair[-1]
+                    if abs((cen1- cen2).dot(App.Vector(1,0,0))) < epsilon and last_pair.is_horizontal(): #vertical
+                        if cen2.y < last_pair.C2.y:
+                            # Swap(e, next_e)
+                            e, next_e = next_e, e
                 pt_0.check = True
                 pt_1.check = True
                 rtEdge_pair.append(PairedEdge(e, next_e))
+
         rtopen.set_rtEdge_pair(rtEdge_pair)
-        rtopen_list.appen(rtopen)
+        # Check rtopen width
+        para_list = rtopen.find_pair_paralines()
+        for l1, l2 in para_list:
+            l_tan = l1.tangentAt(0)
+            # l1, l2 is horizontal
+            if abs(l_tan.dot(App.Vector(0.0, 1.0, 0.0))) < epsilon: # h_lines
+                rt_w = l2.Vertexes[0].Point.y - l1.Vertexes[0].Point.y
+                if rt_w < rtHoleWidth:
+                    # Draw lines in Layer 
+                    if l1.Length < l2.Length:
+                        shorter = l1
+                    else:
+                        shorter = l2
+                    start = App.Vector(shorter.CenterOfMass.x, l1.Vertexes[0].Point.y, 0)
+                    end = App.Vector(start.x, l2.Vertexes[0].Point.y, 0)
+                    problem_rt_width_sh_list.append(Part.makeLine(start, end))
+            else:
+                rt_w = l2.Vertexes[0].Point.x - l1.Vertexes[0].Point.x
+                if rt_w < rtHoleWidth:
+                    # Draw lines in Layer 
+                    if l1.Length < l2.Length:
+                        shorter = l1
+                    else:
+                        shorter = l2
+                    start = App.Vector(l1.Vertexes[0].Point.x, shorter.CenterOfMass.y, 0)
+                    end = App.Vector(l2.Vertexes[1].Point.x, start.y, 0)
+                    problem_rt_width_sh_list.append(Part.makeLine(start, end))
         
-    
+        # Check rtopen addLen
+        rtopen_bbox = wire.BoundBox
+        first_edges = rtopen.rtEdge_pair[0]
+        last_edges = rtopen.rtEdge_pair[-1]
+        # Check rtopen head
+        if first_edges.is_horizontal():
+            rt_addl = first_edges.C1.x - rtopen_bbox.XMin
+            if rt_addl < rtHoleAddLen:
+                start = first_edges.C1
+                end = start + rt_addl * (-first_edges.C12_udir)
+                problem_rt_addLen_sh_list.append(Part.makeLine(start, end))
+        else:
+            rt_addl = first_edges.C1.y - rtopen_bbox.YMin
+            if rt_addl < rtHoleAddLen:
+                start = first_edges.C1
+                end = start + rt_addl * (-first_edges.C12_udir)
+                problem_rt_addLen_sh_list.append(Part.makeLine(start, end))
+
+        # Check rtopen tail
+        if last_edges.is_horizontal():
+            rt_addl = rtopen_bbox.XMax - last_edges.C2.x 
+            if rt_addl < rtHoleAddLen:
+                start = last_edges.C2
+                end = start + rt_addl * last_edges.C12_udir
+                problem_rt_addLen_sh_list.append(Part.makeLine(start, end))
+        else:
+            if last_edges.C12_udir.y < 0:
+                rt_addl = last_edges.C2.y - rtopen_bbox.YMin
+            else:
+                rt_addl = rtopen_bbox.YMax - last_edges.C2.y
+            if rt_addl < rtHoleAddLen:
+                start = last_edges.C2
+                end = start + rt_addl * last_edges.C12_udir
+                problem_rt_addLen_sh_list.append(Part.makeLine(start, end))
+        rtopen_list.append(rtopen)
+
+    error_line_color = (1.0, 1.0, 0.0)
+    error_shape_color = (1.0, 0.0, 0.0)
+
+    problem_rt_width_list = []
+    for sh in problem_rt_width_sh_list:
+        problem = formObject(sh)
+        problem.ViewObject.LineColor = error_line_color
+        problem.ViewObject.ShapeColor = error_shape_color
+        problem_rt_width_list.append(problem)
+
+    # Create layer_rt_width
+    layer_rt_width = App.ActiveDocument.addObject('App::DocumentObjectGroup', 'Problem_rt_width')
+    layer_rt_width.Group = problem_rt_width_list
+    layer_rt_width.Label = "[ERROR] Router Open Hole Width less than {}mm".format(rtHoleWidth)
+    #export_list.append(layer_rt_width)
+        
+    problem_rt_addLen_list = []
+    for sh in problem_rt_addLen_sh_list:
+        problem = formObject(sh)
+        problem.ViewObject.LineColor = error_line_color
+        problem.ViewObject.ShapeColor = error_shape_color
+        problem_rt_addLen_list.append(problem)
+
+    # Create layer_rt_addLen
+    layer_rt_addLen = App.ActiveDocument.addObject('App::DocumentObjectGroup', 'Problem_rt_addLen')
+    layer_rt_addLen.Group = problem_rt_addLen_list
+    layer_rt_addLen.Label = "[ERROR] Router Open Hole addLen less than {}mm".format(rtHoleAddLen)
     
 
     """    
