@@ -35,7 +35,7 @@ class PairedEdge:
         self.C12_udir = (self.C2- self.C1).normalize()
     def is_horizontal(self):
         epsilon = 0.000001
-        return abs((self.C1- self.C2).dot(App.Vector(0,1,0))) < epsilon
+        return abs((self.C12_udir).dot(App.Vector(0,1,0))) < epsilon
 
 class RTOpen:
     def __init__(self, wire):
@@ -78,7 +78,14 @@ class RTOpen:
             mid = (l + u) // 2
             while (l <= u):
                 if hl[mid].Vertexes[0].Point.y < value < hl[mid+1].Vertexes[0].Point.y:
-                    return [hl[mid], hl[mid+1]]
+                    a1 = value - hl[mid].Vertexes[0].Point.y
+                    a2 = hl[mid+1].Vertexes[0].Point.y- value
+                    if abs(a1 - a2) < 0.01: # absolutely close
+                        return [hl[mid], hl[mid+1]]
+                    elif a1 > a2 and mid+2 < len(hl)-1: # find next line
+                        return [hl[mid], hl[mid+2]]
+                    else:
+                        return [hl[mid-1], hl[mid+1]]
                 elif value >= hl[mid+1].Vertexes[0].Point.y:
                     l = mid+1
                 else:
@@ -90,7 +97,14 @@ class RTOpen:
             mid = (l + u) // 2
             while (l <= u):
                 if vl[mid].Vertexes[0].Point.x < value < vl[mid+1].Vertexes[0].Point.x:
-                    return [vl[mid], vl[mid+1]]
+                    a1 = value - vl[mid].Vertexes[0].Point.x
+                    a2 = vl[mid+1].Vertexes[0].Point.x- value
+                    if abs(a1 - a2) < 0.01: # absolutely close
+                        return [vl[mid], vl[mid+1]]
+                    elif a1 > a2 and mid+2 < len(hl)-1: # find next line
+                        return [vl[mid], vl[mid+2]]
+                    else:
+                        return [vl[mid-1], vl[mid+1]]
                 elif value >= vl[mid+1].Vertexes[0].Point.x:
                     l = mid+1
                 else:
@@ -837,25 +851,29 @@ def run_router():
                 continue
 
             pt_1 = rtEdges_Open[idx+1]
-            w = pt_0.wire
-            e = w.Edges[0]
-            V1 = (e.valueAt(pi/2) - e.Curve.Center) #from center to arc_bulge
-            next_w = pt_1.wire
-            next_e = next_w.Edges[0]
-            next_V1 = (next_e.valueAt(pi/2) - next_e.Curve.Center) #from center to arc_buldge
-            if V1.dot(next_V1) < 0: 
-                # Take last pair to compare
-                if rtEdge_pair:
-                    cen1 = e.Curve.Center
-                    cen2 = next_e.Curve.Center
-                    last_pair = rtEdge_pair[-1]
-                    if abs((cen1- cen2).dot(App.Vector(1,0,0))) < epsilon and last_pair.is_horizontal(): #vertical
-                        if cen2.y < last_pair.C2.y:
-                            # Swap(e, next_e)
-                            e, next_e = next_e, e
-                pt_0.check = True
-                pt_1.check = True
-                rtEdge_pair.append(PairedEdge(e, next_e))
+            e0 = pt_0.wire.Edges[0]
+            e1 = pt_1.wire.Edges[0]
+            c0 = e0.Curve.Center
+            c1 = e1.Curve.Center
+            pt_0.check = True
+            pt_1.check = True
+
+            # I Need 'Next' Pair's First point
+            if idx+2 <= items-1:
+                next_pt_0 = rtEdges_Open[idx+2]
+                next_c0 = next_pt_0.Edges[0].Curve.Center
+                # c0, next_c0 is closer than c1, next_c0
+                if (c0- next_c0).dot(c0- next_c0) < (c1- next_c0).dot(c1- next_c0): 
+                    rtEdge_pair.append(PairedEdge(c1, c0))
+                else:
+                    rtEdge_pair.append(PairedEdge(c0, c1))
+            elif rtEdge_pair:
+                # c0, pre_c1 is closer than c1, pre_c1
+                pre_c1 = rtEdge_pair[-1].C2
+                if (c0- pre_c1).dot(c0- pre_c1) < (c1- pre_c1).dot(c1- pre_c1): 
+                    rtEdge_pair.append(PairedEdge(c0, c1))
+                else:
+                    rtEdge_pair.append(PairedEdge(c1, c0))
 
         rtopen.set_rtEdge_pair(rtEdge_pair)
         # Check rtopen width
@@ -874,6 +892,7 @@ def run_router():
                     start = App.Vector(shorter.CenterOfMass.x, l1.Vertexes[0].Point.y, 0)
                     end = App.Vector(start.x, l2.Vertexes[0].Point.y, 0)
                     problem_rt_width_sh_list.append(Part.makeLine(start, end))
+            # l1, l2 is vertical
             else:
                 rt_w = l2.Vertexes[0].Point.x - l1.Vertexes[0].Point.x
                 if rt_w < rtHoleWidth:
@@ -897,8 +916,12 @@ def run_router():
                 start = first_edges.C1
                 end = start + rt_addl * (-first_edges.C12_udir)
                 problem_rt_addLen_sh_list.append(Part.makeLine(start, end))
-        else:
-            rt_addl = first_edges.C1.y - rtopen_bbox.YMin
+        else: #Vertical!!
+            if first_edges.C12_udir.y > 0: # upward
+                rt_addl = first_edges.C1.y - rtopen_bbox.YMin
+            else:
+                rt_addl = rtopen_bbox.YMax - first_edges.C1.y 
+
             if rt_addl < rtHoleAddLen:
                 start = first_edges.C1
                 end = start + rt_addl * (-first_edges.C12_udir)
@@ -916,10 +939,12 @@ def run_router():
                 rt_addl = last_edges.C2.y - rtopen_bbox.YMin
             else:
                 rt_addl = rtopen_bbox.YMax - last_edges.C2.y
+
             if rt_addl < rtHoleAddLen:
                 start = last_edges.C2
                 end = start + rt_addl * last_edges.C12_udir
                 problem_rt_addLen_sh_list.append(Part.makeLine(start, end))
+
         rtopen_list.append(rtopen)
 
     error_line_color = (1.0, 1.0, 0.0)
@@ -950,6 +975,9 @@ def run_router():
     layer_rt_addLen.Group = problem_rt_addLen_list
     layer_rt_addLen.Label = "[ERROR] Router Open Hole addLen less than {}mm".format(rtHoleAddLen)
     
+    #===================================================
+    # Function 3: Guide Pin Related
+    #===================================================
 
     """    
     # Get wires_stopBlock
