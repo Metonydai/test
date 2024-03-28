@@ -26,6 +26,39 @@ class Dot:
     def set_paired_dot(self, paired):
         self.paired = paired
 
+class GPin:
+    def __init__(self, wire):
+        self.wire = wire
+        self.C1, self.C2 = self._findCenter()
+        self.radius = 0
+        self.isCircle = False
+    def _findCenter(self):
+        if len(self.wire.Edges) == 1: # Circle
+            cen = self.wire.Edges[0].Curve.Center
+            self.isCircle = True
+            return cen, cen
+        cens = []
+        for e in self.wire.Edges:
+            if e.Curve.TypeId == "Part::GeomCircle":
+                cens.append(e.Curve.Center)
+                if self.radius==0:
+                    self.radius = e.Curve.Radius
+        assert len(cens) == 2, "Guide Pin Shape Error"
+        # Check C1 and C2 are coincident
+        if hash((cens[0].x, cens[0].y)) == hash((cens[1].x, cens[1].y)):
+            self.isCircle = True
+        return cens[0], cens[1]
+
+    @property
+    def diameter(self):
+        return 2 * self.radius
+
+    @property
+    def C12_udir(self):
+        if self.isCircle:
+            return None
+        return (self.C2- self.C1).normalize()
+
 class PairedEdge:
     def __init__(self, left_open, right_open):
         self.left_open = left_open
@@ -814,7 +847,7 @@ def run_router():
     # Create quadtree_rtEdge
     quadtree_rtEdge = QuadTree(routerEdge_bbox.XMin, routerEdge_bbox.YMin, routerEdge_bbox.XMax, routerEdge_bbox.YMax)
     rtEdge_Point = [Point(w) for w in routerEdge.wire_list]
-    print(len(rtEdge_Point))
+    #print(len(rtEdge_Point))
 
     pi = 3.1415926535900773
     for pt in rtEdge_Point:
@@ -858,22 +891,24 @@ def run_router():
             pt_0.check = True
             pt_1.check = True
 
+            if items == 2:
+                rtEdge_pair.append(PairedEdge(e0, e1))
             # I Need 'Next' Pair's First point
-            if idx+2 <= items-1:
+            elif idx+2 <= items-1:
                 next_pt_0 = rtEdges_Open[idx+2]
-                next_c0 = next_pt_0.Edges[0].Curve.Center
+                next_c0 = next_pt_0.wire.Edges[0].Curve.Center
                 # c0, next_c0 is closer than c1, next_c0
                 if (c0- next_c0).dot(c0- next_c0) < (c1- next_c0).dot(c1- next_c0): 
-                    rtEdge_pair.append(PairedEdge(c1, c0))
+                    rtEdge_pair.append(PairedEdge(e1, e0))
                 else:
-                    rtEdge_pair.append(PairedEdge(c0, c1))
+                    rtEdge_pair.append(PairedEdge(e0, e1))
             elif rtEdge_pair:
                 # c0, pre_c1 is closer than c1, pre_c1
                 pre_c1 = rtEdge_pair[-1].C2
                 if (c0- pre_c1).dot(c0- pre_c1) < (c1- pre_c1).dot(c1- pre_c1): 
-                    rtEdge_pair.append(PairedEdge(c0, c1))
+                    rtEdge_pair.append(PairedEdge(e0, e1))
                 else:
-                    rtEdge_pair.append(PairedEdge(c1, c0))
+                    rtEdge_pair.append(PairedEdge(e1, e0))
 
         rtopen.set_rtEdge_pair(rtEdge_pair)
         # Check rtopen width
@@ -978,6 +1013,20 @@ def run_router():
     #===================================================
     # Function 3: Guide Pin Related
     #===================================================
+    # Obtain Board_Face list
+
+    # Obtain Layer guidePin and create GPIN object
+    guidePin_list = [GPin(wire) for wire in guidePin.wire_list]
+
+    for gp in guidePin_list:
+        if gp.isCircle:
+            continue
+        # find edge in quadtree_rtEdge along C12_udir
+
+        
+        
+
+        
 
     """    
     # Get wires_stopBlock
@@ -1404,7 +1453,7 @@ def run_unloader():
     #    new_layer_wire.append(obj_wire)
 
     #new_layer.Group = new_layer_wire
-    export_list.append(board_pocket.getLayer())
+    export_list.append(board_pocket.getLayor())
 
     pair_board_objs = []
     board_color = (0.0, 0.0, 1.0)
