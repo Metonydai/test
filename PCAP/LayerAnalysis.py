@@ -32,6 +32,8 @@ class GPin:
         self.C1, self.C2 = self._findCenter()
         self.radius = 0
         self.isCircle = False
+        self.pcb_dir1 = None
+        self.pcb_dir2 = None
     def _findCenter(self):
         if len(self.wire.Edges) == 1: # Circle
             cen = self.wire.Edges[0].Curve.Center
@@ -48,6 +50,12 @@ class GPin:
         if hash((cens[0].x, cens[0].y)) == hash((cens[1].x, cens[1].y)):
             self.isCircle = True
         return cens[0], cens[1]
+
+    def set_pcb_dir1(self, vec):
+        self.pcb_dir1 = vec
+
+    def set_pcb_dir2(self, vec):
+        self.pcb_dir2 = vec
 
     @property
     def diameter(self):
@@ -1014,14 +1022,39 @@ def run_router():
     # Function 3: Guide Pin Related
     #===================================================
     # Obtain Board_Face list
+    board_count = int(4) # Trough pcaplib
+    botpaste.wire_list.sort(key=lambda w : w.Area, reverse = True)
+    board_wire = botpaste[:board_count]
 
     # Obtain Layer guidePin and create GPIN object
     guidePin_list = [GPin(wire) for wire in guidePin.wire_list]
+    checkDist = 0.2
 
     for gp in guidePin_list:
         if gp.isCircle:
             continue
-        # find edge in quadtree_rtEdge along C12_udir
+        # Try dir1, dir2 perpendicular to C12_udir
+        dir1 = -gp.C12_udir.y + gp.C12_udir.x
+        dir2 = -gp.C12_udir.y + gp.C12_udir.x
+        test_st = (gp.C1 + gp.C2)/2
+            
+        # Check dir1
+        test_point = test_st + checkDist * dir1
+        for bd in board_wire:
+            face_bd = Part.Face(bd)
+            if face_bd.isInside(test_point):
+                gp.set_pcb_dir1(dir1)
+                break
+
+        # Check dir2
+        test_point = test_st + checkDist * dir2
+        for bd in board_wire:
+            face_bd = Part.Face(bd)
+            if face_bd.isInside(test_point):
+                gp.set_pcb_dir2(dir2)
+                break
+        
+
 
         
         
