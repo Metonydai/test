@@ -237,7 +237,7 @@ class Setting:
                     obj_botpaste.append(objects[i])
             elif re.search('open|through|thru', objects[i].lower()):
                 obj_open.append(objects[i])
-            elif re.search('2\.5|1\.6', objects[i].lower()):
+            elif re.search('boardsink', objects[i].lower()):
                 obj_board_sink.append(objects[i])
             elif re.search('guide.*pin|pin.*guide', objects[i].lower()):
                 obj_guide_pin.append(objects[i])
@@ -268,7 +268,7 @@ class Setting:
         self.widget.ulLayerOfBotsilk.addItems(obj_botsilk)
         self.widget.ulLayerOfBotpaste.addItems(obj_botpaste)
         self.widget.ulLayerOfBotmask.addItems(obj_botmask)
-        self.widget.ulLayerOfBoardSink.addItems(obj_board_sink)
+        #self.widget.ulLayerOfBoardSink.addItems(obj_board_sink)
         self.widget.ulListOfLayers.addItems(obj_array + obj_open + obj_fixed_pin + obj_stop_block + obj_pressfit + obj_edge+ obj_support_pin + obj_support_block + obj_guide_pin)
 
         # Add Layers For Wave_Solder : tabWidget index = 2
