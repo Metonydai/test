@@ -1,17 +1,30 @@
+from data_access.get_config import get_rmq_conn
 import pika
 import json
+from time import time
+import uuid
 
 # Need ACCOUNT, PWD, IP, PORT for MQ connection
-ACCOUNT, PWD, IP, PORT = get_rmq_conn()
+DEV_ACCOUNT, DEV_PWD, DEV_IP, DEV_PORT = get_rmq_conn("DEV")
+STAGE_ACCOUNT, STAGE_PWD, STAGE_IP, STAGE_PORT = get_rmq_conn("STAGE")
+PROD_ACCOUNT, PROD_PWD, PROD_IP, PROD_PORT = get_rmq_conn("PROD")
 CONSUMER_MESSAGE_QUEUE = "magnetic-simulation.request.simulate"  # CONSUMER QUEUE
 PRODUCER_EXCHANGE = "magenetic-simulation.response"  # PRODUCER EXCHANGE
 
 
 class RabbitMQ():
-    def __init__(self, queue_name="", exchange=""):
+    def __init__(self, queue_name="", exchange="", env="dev"):
         self.queue_name = queue_name
         self.exchange = exchange
-        self.connection = self.connect(ACCOUNT, PWD, IP, PORT)
+        if env == "dev":
+            self.connection = self.connect(DEV_ACCOUNT, DEV_PWD, DEV_IP, DEV_PORT)
+        elif env == "stage":
+            self.connection = self.connect(STAGE_ACCOUNT, STAGE_PWD, STAGE_IP, STAGE_PORT)
+        elif env == "prod":
+            self.connection = self.connect(PROD_ACCOUNT, PROD_PWD, PROD_IP, PROD_PORT)
+        else:
+            self.connection = self.connect(DEV_ACCOUNT, DEV_PWD, DEV_IP, DEV_PORT)
+
         self.channel = self.connection.channel()
 
         if queue_name == "":
@@ -69,10 +82,10 @@ class RabbitMQ():
 
             # ============ something write to queue ============
             return_dict = {}
-            username = 'XXXX'
-            message_id = 'XXXX'
-            timestamp = 'XXXX'
-            service_name = 'XXXX'
+            username = properties.headers.get("username")
+            message_id = uuid.uuid4()
+            timestamp = int(time.time)
+            service_name = 'electromagnetic_algorithm'
             # make your return info......
             # ......
             # ......
@@ -93,11 +106,17 @@ class RabbitMQ():
             callback(self.channel, method, properties, body)
 
 
-def main():
-    mq = RabbitMQ(CONSUMER_MESSAGE_QUEUE)
-    mq.CONSUMER()
-    mq.close()
-
-
 if __name__ == "__main__":
-    main()
+    dev_mq = RabbitMQ(CONSUMER_MESSAGE_QUEUE, env="dev")
+    stage_mq = RabbitMQ(CONSUMER_MESSAGE_QUEUE, env="stage")
+    prod_mq = RabbitMQ(CONSUMER_MESSAGE_QUEUE, env="prod")
+
+    while(True):
+        dev_mq.CONSUMER()
+        stage_mq.CONSUMER()
+        prod_mq.CONSUMER()
+        time.sleep(3)
+
+    dev_mq.close()
+    prod_mq.close()
+    stage_mq.close()
