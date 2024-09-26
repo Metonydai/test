@@ -20,6 +20,8 @@ CORE_GEN_SERVICE_PATH = str(Path(__file__).parent / 'CoreGen.py')
 CORE_WINDING_GEN_SERVICE_PATH = str(Path(__file__).parent / 'CoreWindingGen.py')
 TASK_FILE_MAPPING = {'core_gen':CORE_GEN_SERVICE_PATH, 'core_winding_gen': CORE_WINDING_GEN_SERVICE_PATH}
 
+RMQ_WORKER_PATH = str(Path(__file__).parent / 'rabbitq_worker.py')
+
 WORKER_DURATION, WORKER_CNT = get_config.get_controller()
 FREECAD_PYTHON_ENV = get_config.get_freecad_python_env()
 FLASK_PORT = get_config.get_flask_port()
@@ -35,6 +37,11 @@ LOG = LoggerManager().getlog()
 ### Start Flask
 def start_flask_worker() -> int:
     cmd = subprocess.Popen([CMD_PYTHON, FLASK_WORKER_PATH], shell=True)
+    return cmd.pid
+
+### Start RabbitMQ
+def start_rmq_worker() -> tuple[int, int, int]:
+    cmd = subprocess.Popen([CMD_PYTHON, RMQ_WORKER_PATH], shell=True)
     return cmd.pid
 
 ### Check Flask
@@ -79,7 +86,7 @@ def check_fc_pid_status(pid_dict, worker_duration, service) -> dict:
                     print("Error Execution and Kill FREECAD WORKER PID:", child_pid)
                     pid_dict.pop(child_pid)
                     # Create a new worker and upadate to pid_dict
-                    pid_dict.update(exe_popen(TASK_FILE_MAPPING(service)))
+                    pid_dict.update(exe_popen(TASK_FILE_MAPPING[service]))
 
                 # check memory usage ( > 2GB)
                 for child in children_process:
@@ -95,16 +102,19 @@ def check_fc_pid_status(pid_dict, worker_duration, service) -> dict:
                     os.system(TASKKILL_PID_FMT % str(child_pid))
                     pid_dict.pop(child_pid)
                     # Create a new worker and upadate to pid_dict
-                    pid_dict.update(exe_popen(TASK_FILE_MAPPING(service)))
+                    pid_dict.update(exe_popen(TASK_FILE_MAPPING[service]))
             else:
+                print(f"FREECAD WORKER PID: {child_pid} DOES NOT EXIST, AND KILL THIS WORKER!", )
+                log_msg = f"FREECAD WORKER PID: {child_pid} DOES NOT EXIST, AND KILL THIS WORKER!"
+                LOG.info('(%s) %s', __name__, log_msg , extra={'correlationId': '['+ 'NULL'+']'})
                 os.system(TASKKILL_PID_FMT % str(child_pid))
                 pid_dict.pop(child_pid)
                 # Create a new worker and upadate to pid_dict
-                pid_dict.update(exe_popen(TASK_FILE_MAPPING(service)))
+                pid_dict.update(exe_popen(TASK_FILE_MAPPING[service]))
         # Keep Worker headcount
         if len(pid_dict) < WORKER_CNT:
             for _ in range(WORKER_CNT- len(pid_dict)):
-                pid_dict.update(exe_popen(TASK_FILE_MAPPING(service)))
+                pid_dict.update(exe_popen(TASK_FILE_MAPPING[service]))
                 log_msg = f"ADD FREECAD WORKER"
                 LOG.info('(%s) %s', __name__, log_msg , extra={'correlationId': '['+ 'NULL'+']'})
             
@@ -146,10 +156,14 @@ if __name__ == '__main__':
     # initial flask API
     flask_pid = start_flask_worker()
 
+    # initial RabbitMQ worker
+    rmq_pid = start_rmq_worker()
+
     glb_core_pid_dict = {}
     glb_core_winding_pid_dict = {}
     while True:
         flask_pid = check_flask_pid_status(flask_pid)
+        rmq_pid = check_flask_pid_status(rmq_pid)
         glb_core_pid_dict = check_fc_pid_status(glb_core_pid_dict, WORKER_DURATION, 'core_gen')
         glb_core_winding_pid_dict = check_fc_pid_status(glb_core_winding_pid_dict, WORKER_DURATION, 'core_winding_gen')
         
