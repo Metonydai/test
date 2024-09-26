@@ -1,8 +1,9 @@
-from pathlib import Path
-import pyaedt
-from sis_maxwell.post_processing import SISPost
+
+LOG = LoggerManager().getlog(env)
 
 env_path = Path("E://")
+
+receive_dict = json.loads(serialized_dict)
 
 receive_dict = {
     "taskId": 1,
@@ -1671,25 +1672,9 @@ m3d.save_project(str(Path(project_directory) / (project_name+ ".aedt")))
 m3d.close_project(project_name, save_project=False)
 m3d.odesktop.GetProcessID()
 
-eddy_design_name = "Maxwell3DDesign_Eddy"
-project_name = "CHECK_HUI"
-m3d = pyaedt.Maxwell3d(projectname=project_name,
-                       designname=eddy_design_name,
-                       solution_type="EddyCurrent",
-                       specified_version=version,
-                       non_graphical=non_graphical,
-                       new_desktop_session=False
-                       )
-
-
 #%%
 ###############################################################################
 # Close AEDT
 # ~~~~~~~~~~
-# After the simulation completes, you can close AEDT or release it using the
-# :func:`pyaedt.Desktop.release_desktop` method.
-# All methods provide for saving the project before closing.
 
 m3d.release_desktop()
-#temp_dir.cleanup()
-v
