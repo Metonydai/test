@@ -62,6 +62,23 @@ def check_flask_pid_status(flask_pid) -> int:
         flask_pid = start_flask_worker()
     return flask_pid
 
+def check_rmq_pid_status(rmq_pid) -> int:
+    if (psutil.pid_exists(rmq_pid)):
+        pid_state = psutil.Process(rmq_pid).status()
+        if (pid_state == 'running'):
+            log_msg = f"Normal Execution RabbitMQ PID: {rmq_pid}"
+            LOG.info('(%s) %s', __name__, log_msg , extra={'correlationId': '['+ 'NULL'+']'})
+            print("Normal Execution RabbitMQ PID:", rmq_pid)
+        else:
+            os.system(TASKKILL_PID_FMT % str(rmq_pid))
+            log_msg = f"Error Execution and Kill RabbitMQ PID: {rmq_pid}"
+            LOG.error('(%s) %s', __name__, log_msg , extra={'correlationId': '['+ 'NULL'+']'})
+            print("Error Execution and Kill RabbitMQ PID:", rmq_pid)
+            rmq_pid = start_rmq_worker()
+    else:
+        rmq_pid = start_rmq_worker()
+    return rmq_pid
+
 def check_fc_pid_status(pid_dict, worker_duration, service) -> dict:
     if len(pid_dict) == 0:
         return {}
