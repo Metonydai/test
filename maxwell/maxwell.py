@@ -1,3 +1,14 @@
+from sis_maxwell.post_processing import SISPost
+from data_access.logger import LoggerManager
+
+import pyaedt
+
+import sys
+from pathlib import Path
+
+serialized_dict = sys.argv[1]
+env = sys.argv[2]
+correlation_id = int(sys.argv[3])
 
 LOG = LoggerManager().getlog(env)
 
