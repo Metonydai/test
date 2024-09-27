@@ -3,9 +3,13 @@ from data_access.logger import LoggerManager
 import os
 import pika
 import json
-from time import time
+import time
 import uuid
 import psutil
+import subprocess
+from pathlib import Path
+
+TASKKILL_PID_FMT = "taskkill /pid %s -t -f"
 
 # Need ACCOUNT, PWD, IP, PORT for MQ connection
 DEV_ACCOUNT, DEV_PWD, DEV_IP, DEV_PORT = get_rmq_conn("DEV")
@@ -15,6 +19,7 @@ CONSUMER_MESSAGE_QUEUE = "magnetic-simulation.request.simulate"  # CONSUMER QUEU
 PRODUCER_EXCHANGE = "magenetic-simulation.response"  # PRODUCER EXCHANGE
 
 SIM_TIMEOUT = 7200
+SIM_SURVICE_PATH = "maxwell_simulate.py"
 
 class RabbitMQ():
     def __init__(self, queue_name="", exchange="", env="dev"):
@@ -22,16 +27,16 @@ class RabbitMQ():
         self.exchange = exchange
         if env == "dev":
             self.connection = self.connect(DEV_ACCOUNT, DEV_PWD, DEV_IP, DEV_PORT)
-            self.log = LoggerManager.getLog("dev")
+            self.log = LoggerManager(env="dev").getLog()
         elif env == "stage":
             self.connection = self.connect(STAGE_ACCOUNT, STAGE_PWD, STAGE_IP, STAGE_PORT)
-            self.log = LoggerManager.getLog("stage")
+            self.log = LoggerManager(env="stage").getLog()
         elif env == "prod":
             self.connection = self.connect(PROD_ACCOUNT, PROD_PWD, PROD_IP, PROD_PORT)
-            self.log = LoggerManager.getLog("prod")
+            self.log = LoggerManager(env="prod").getLog()
         else:
             self.connection = self.connect(DEV_ACCOUNT, DEV_PWD, DEV_IP, DEV_PORT)
-            self.log = LoggerManager.getLog("dev")
+            self.log = LoggerManager(env="dev").getLog()
 
         self.channel = self.connection.channel()
 
@@ -80,18 +85,18 @@ class RabbitMQ():
             correlation_id = properties.correlation_id
             reply_to = properties.reply_to
 
-            env = properties.headers.get("SIS_environment")
+            env_type = properties.headers.get("SIS-Application-Environment")
 
             # ====== parse body to get request parameter =======
             #receive_dict = json.loads(body.decode())
             serialized_dict = body.decode()
-            process = subprocess.Popen(["python", "maxwell.py", serialized_dict], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            process = subprocess.Popen(["python", SIM_SURVICE_PATH, serialized_dict, env_type, correlation_id], stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
             sim_st_time = time.time()
 
             #stdout, stderr = process.communicate() # Capture output
             return_dict = {}
-            success_file = Path()
-            error_file = Path()
+            success_file = Path("")
+            error_file = Path("")
 
             while True:
                 sim_time = time.time()
@@ -151,16 +156,19 @@ class RabbitMQ():
 
 
 if __name__ == "__main__":
-    dev_mq = RabbitMQ(CONSUMER_MESSAGE_QUEUE, env="dev")
-    stage_mq = RabbitMQ(CONSUMER_MESSAGE_QUEUE, env="stage")
-    prod_mq = RabbitMQ(CONSUMER_MESSAGE_QUEUE, env="prod")
-
+#    dev_mq = RabbitMQ(CONSUMER_MESSAGE_QUEUE, env="dev")
+#    stage_mq = RabbitMQ(CONSUMER_MESSAGE_QUEUE, env="stage")
+#    prod_mq = RabbitMQ(CONSUMER_MESSAGE_QUEUE, env="prod")
+#
+#    while(True):
+#        dev_mq.CONSUMER()
+#        stage_mq.CONSUMER()
+#        prod_mq.CONSUMER()
+#        time.sleep(3)
+#
+#    dev_mq.close()
+#    prod_mq.close()
+#    stage_mq.close()
     while(True):
-        dev_mq.CONSUMER()
-        stage_mq.CONSUMER()
-        prod_mq.CONSUMER()
+        print("HUIYU, I love you")
         time.sleep(3)
-
-    dev_mq.close()
-    prod_mq.close()
-    stage_mq.close()
