@@ -1,5 +1,6 @@
 from data_access.get_config import get_rmq_conn
 from data_access.logger import LoggerManager
+from data_access import get_config
 import os
 import pika
 import json
@@ -10,6 +11,11 @@ import subprocess
 from pathlib import Path
 
 TASKKILL_PID_FMT = "taskkill /pid %s -t -f"
+
+DEV_FOLDER_PATH = Path(get_config.get_dev_folder_path())
+STAGE_FOLDER_PATH = Path(get_config.get_stage_folder_path())
+PROD_FOLDER_PATH = Path(get_config.get_prod_folder_path())
+LOCAL_FOLDER_PATH = Path(get_config.get_local_folder_path())
 
 # Need ACCOUNT, PWD, IP, PORT for MQ connection
 DEV_ACCOUNT, DEV_PWD, DEV_IP, DEV_PORT = get_rmq_conn("DEV")
@@ -86,17 +92,26 @@ class RabbitMQ():
             reply_to = properties.reply_to
 
             env_type = properties.headers.get("SIS-Application-Environment")
+            if env_type == "dev":
+                env_path = DEV_FOLDER_PATH
+            elif env_type == "stage":
+                env_path = STAGE_FOLDER_PATH
+            elif env_type == "prod":
+                env_path = PROD_FOLDER_PATH
+            else:
+                env_path = DEV_FOLDER_PATH
 
             # ====== parse body to get request parameter =======
-            #receive_dict = json.loads(body.decode())
-            serialized_dict = body.decode()
+            serialized_dict = body.decode() # A string
             process = subprocess.Popen(["python", SIM_SURVICE_PATH, serialized_dict, env_type, correlation_id], stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
             sim_st_time = time.time()
+            request_dict = json.loads(body.decode())
+            project_directory = Path(env_type / Path(request_dict["macroFilePath"])).parent[2] / "AEDT_project"
 
             #stdout, stderr = process.communicate() # Capture output
             return_dict = {}
-            success_file = Path("")
-            error_file = Path("")
+            success_file = Path(project_directory / "SUCCESS.txt")
+            error_file = Path(project_directory / "ERROR.txt")
 
             while True:
                 sim_time = time.time()
@@ -126,10 +141,10 @@ class RabbitMQ():
                         break
 
                 if (success_file.exists()):
-                    return_dict = {}
+                    return_dict = json.loads(success_file.read_text())
                     break
                 elif (error_file.exists()):
-                    return_dict = {}
+                    return_dict = json.loads(error_file.read_text())
                     break
 
                 time.sleep(3)
@@ -156,19 +171,19 @@ class RabbitMQ():
 
 
 if __name__ == "__main__":
-#    dev_mq = RabbitMQ(CONSUMER_MESSAGE_QUEUE, env="dev")
-#    stage_mq = RabbitMQ(CONSUMER_MESSAGE_QUEUE, env="stage")
-#    prod_mq = RabbitMQ(CONSUMER_MESSAGE_QUEUE, env="prod")
-#
-#    while(True):
-#        dev_mq.CONSUMER()
-#        stage_mq.CONSUMER()
-#        prod_mq.CONSUMER()
-#        time.sleep(3)
-#
-#    dev_mq.close()
-#    prod_mq.close()
-#    stage_mq.close()
+    dev_mq = RabbitMQ(CONSUMER_MESSAGE_QUEUE, env="dev")
+    stage_mq = RabbitMQ(CONSUMER_MESSAGE_QUEUE, env="stage")
+    prod_mq = RabbitMQ(CONSUMER_MESSAGE_QUEUE, env="prod")
+
     while(True):
-        print("HUIYU, I love you")
+        dev_mq.CONSUMER()
+        stage_mq.CONSUMER()
+        prod_mq.CONSUMER()
         time.sleep(3)
+
+    dev_mq.close()
+    prod_mq.close()
+    stage_mq.close()
+    #while(True):
+    #    print("HUIYU, I love you")
+    #    time.sleep(3)
