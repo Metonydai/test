@@ -1,0 +1,29 @@
+core_groups = {
+    "Group1": {"EE_1", "EE_2"},
+    "Group2": {"EER_1"},
+    #"Group3": {}
+}
+
+def find_group(core_type):
+    # Check if any keyword from a group is in the name
+    for group, keywords in core_groups.items():
+        if core_type in keywords:
+            return group
+    return ""
+
+def slice_core(jdict):
+    from pathlib import Path
+    core_type = Path(jdict["macroFilePath"]).stem
+    
+    core_group = find_group(core_type)
+    core_dim_dict = {}
+    for cdim in jdict['core']['dims']:
+        core_dim_dict[cdim['name']] = cdim['value']
+
+    if core_group == "Group1":
+        slice_x = 0.0
+        slice_y = core_dim_dict['Dim_F'] / 4
+        slice_z = (core_dim_dict["Dim_D"] + core_dim_dict['Dim_E']) / 2
+        return slice_x, slice_y, slice_z    
+
+    return 0.0, 0.0, 0.0
